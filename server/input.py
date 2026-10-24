@@ -45,6 +45,10 @@ class Windows:
         self.k.GlobalLock.restype = ctypes.c_void_p
         self.k.GlobalUnlock.argtypes = [ctypes.c_void_p]
         self.k.GlobalFree.argtypes = [ctypes.c_void_p]
+        self.u.IsWindowVisible.argtypes = [wintypes.HWND]
+        self.u.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+        self.u.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+        self.u.SetForegroundWindow.argtypes = [wintypes.HWND]
         self.held = set()
     def move(self, x, y): self.u.mouse_event(1, x, y, 0, 0)
     def button(self, button, down):
@@ -119,7 +123,8 @@ class Windows:
         if not self.u.SetForegroundWindow(wintypes.HWND(handle)): raise RuntimeError('Windows refused focus; use Alt+Tab')
     def power(self, action):
         import subprocess
-        if action == 'lock': self.u.LockWorkStation()
+        if action == 'lock':
+            if not self.u.LockWorkStation(): raise RuntimeError('Windows could not lock the workstation')
         elif action in ('shutdown','restart'):
             subprocess.run(['shutdown','/s' if action=='shutdown' else '/r','/t','30'],check=True)
         elif action == 'cancel': subprocess.run(['shutdown','/a'],check=True)
