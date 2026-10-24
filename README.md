@@ -99,4 +99,8 @@ Bluetooth, jiroskop mouse, telefonun fiziksel ses düğmeleri, resim/dosya panos
 
 Özellik kapsamı için [Remote Mouse](https://play.google.com/store/apps/details?id=com.hungrybolo.remotemouseandroid) ve [Unified Remote](https://www.unifiedremote.com/features) listeleri incelendi. Bu proje bağımsızdır.
 
+Android kabuğunda yedek dışa aktarma JSON metnini seçer; kopyalayarak saklayabilirsin. Tarayıcıda JSON dosyası indirilir.
+
+![Sofa Remote arayüzü](docs/preview.png)
+
 MIT lisansı.
