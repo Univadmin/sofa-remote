@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.state/
+*.log
+android/.gradle/
+android/local.properties
+android/**/build/
+dist/
+build/
