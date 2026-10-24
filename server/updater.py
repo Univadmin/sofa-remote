@@ -39,7 +39,7 @@ class Updater:
                         if a['name'] not in ('SofaRemote.exe','SofaRemote-Android.apk','SofaRemote-Browser.zip'):continue
                         url=a['browser_download_url']
                         if trusted_download(url): assets.append({'name':a['name'],'url':url,'size':a['size'],'digest':a.get('digest','')})
-                    self.status.update(latest=latest,available=newer,assets=assets,state='available' if newer else 'current')
+                    self.status.update(latest=latest,available=newer,ready=False,assets=assets,state='available' if newer else 'current')
                     if newer and download and getattr(sys,'frozen',False) and os.name=='nt':
                         asset=next((a for a in assets if a['name']=='SofaRemote.exe'),None)
                         if not asset: raise ValueError('Windows asset missing')

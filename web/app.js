@@ -11,10 +11,12 @@ function status(message,online=false){$('#connection').textContent='● '+messag
 async function api(path,options={}){const r=await fetch('/api/'+path,{...options,signal:AbortSignal.timeout(6000)});if(!r.ok)throw new Error(await r.text());return r.json()}
 function send(action,wait=false){
   if(ws?.readyState!==1){if(action.type!=='move'&&action.type!=='release')toast('Bilgisayar bağlı değil');return wait?Promise.reject(new Error('Bağlantı yok')):undefined}
+  if(['keys','focus','window','launch','url','macro','tab'].includes(action.type)||(action.type==='button'&&action.down))resetTextInputs();
   const id=++sequence;ws.send(JSON.stringify({...action,id}));if(!wait)return;
   return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Komut zaman aşımı'))},25000);pending.set(id,{resolve,reject,timer})});
 }
-function resetLive(){for(const area of $$('.keyboard-live')){area.value='';area.dataset.previous=''}for(const box of $$('[data-drag]'))box.checked=false;for(const pad of $$('.touchpad'))pad.dispatchEvent(new Event('sofa-reset'))}
+function resetTextInputs(){for(const area of $$('.keyboard-live')){area.value='';area.dataset.previous=''}}
+function resetLive(){resetTextInputs();for(const box of $$('[data-drag]'))box.checked=false;for(const pad of $$('.touchpad'))pad.dispatchEvent(new Event('sofa-reset'))}
 function connect(){
   clearTimeout(retry);if(stopped)return;if(ws?.readyState===0||ws?.readyState===1)return;
   ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/api/ws`);
