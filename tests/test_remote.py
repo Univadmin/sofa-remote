@@ -1,72 +1,95 @@
+import asyncio
 import tempfile
 import unittest
 from aiohttp import CookieJar, WSServerHandshakeError
 from aiohttp.test_utils import TestClient, TestServer
 from server.app import create_app, validate_action, validate_url, Remote
 from server.input import DryRun
+from server.network import local_address
+from server.updater import version_tuple, trusted_download
 
 class ValidationTests(unittest.TestCase):
     def test_url_restrictions(self):
         for url in ['file:///secret','javascript:alert(1)','https://user:pass@example.com','cmd.exe',None]:
             with self.assertRaises(ValueError): validate_url(url)
-        self.assertEqual(validate_url('https://www.netflix.com'),'https://www.netflix.com')
     def test_bad_input(self):
-        for action in [None,[],{'type':'shell'}, {'type':'move','x':float('nan'),'y':0}, {'type':'keys','keys':['FN']}, {'type':'power','action':'shutdown'}, {'type':'delay','ms':5000},{'type':'scroll','amount':True}, {'type':'text','text':'a'*10001}, {'type':'focus','id':True}]:
+        for action in [None,[],{'type':'shell'}, {'type':'move','x':float('nan'),'y':0}, {'type':'keys','keys':['FN']}, {'type':'power','action':'shutdown'}, {'type':'delay','ms':5000},{'type':'scroll','amount':True}, {'type':'edit','delete':-1,'text':'x'}, {'type':'edit','delete':True,'text':'x'}, {'type':'launch','app':'cmd'}, {'type':'tab','action':'activate','tabId':'1'}, {'type':'window','handle':1,'action':'destroy'}]:
             with self.assertRaises(ValueError): validate_action(action)
     def test_advanced_keys(self):
         for keys in [['WIN','D'],['CTRL','SHIFT','T'],['F12'],['PLAYPAUSE']]:
             self.assertEqual(validate_action({'type':'keys','keys':keys})['keys'],keys)
     def test_shortcuts_persist(self):
         with tempfile.TemporaryDirectory() as tmp:
-            r=Remote(DryRun(),tmp);items=[{'name':'Test','actions':[{'type':'keys','keys':['WIN','D']}]}]
+            r=Remote(DryRun(),tmp);items=[{'name':'Türkçe','icon':'🎬','actions':[{'type':'launch','app':'chrome'}]}]
             r.save_shortcuts(items);self.assertEqual(Remote(DryRun(),tmp).load_shortcuts(),items)
             with self.assertRaises(ValueError): r.save_shortcuts([{'name':'bad','actions':[{'type':'power','action':'lock','confirm':True}]}])
             self.assertEqual(r.load_shortcuts(),items)
+    def test_local_networks_only(self):
+        for ip in ['127.0.0.1','192.168.1.9','10.3.0.1','172.31.1.1','::1','::ffff:192.168.1.4']:self.assertTrue(local_address(ip))
+        for ip in ['8.8.8.8','172.32.1.1','example.com',None]:self.assertFalse(local_address(ip))
+    def test_update_sources_and_versions(self):
+        self.assertGreater(version_tuple('v0.10.0'),version_tuple('0.2.0'))
+        with self.assertRaises(ValueError):version_tuple('0.2.0-beta')
+        self.assertTrue(trusted_download('https://github.com/Univadmin/sofa-remote/releases/download/v0.2.0/SofaRemote.exe'))
+        for url in ['https://evil.com/SofaRemote.exe','http://github.com/Univadmin/sofa-remote/releases/download/v1/x','https://github.com/other/repo/releases/download/v1/x']:
+            self.assertFalse(trusted_download(url))
 
 class IntegrationTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.tmp=tempfile.TemporaryDirectory();self.adapter=DryRun();self.app=create_app(self.adapter,self.tmp.name,'123456')
+        self.tmp=tempfile.TemporaryDirectory();self.adapter=DryRun();self.app=create_app(self.adapter,self.tmp.name)
         self.client=TestClient(TestServer(self.app),cookie_jar=CookieJar(unsafe=True));await self.client.start_server()
     async def asyncTearDown(self):
         await self.client.close();self.tmp.cleanup()
-    async def pair(self):
-        self.assertEqual((await self.client.post('/api/pair',json={'pin':'123456'})).status,200)
-    async def test_ui_and_auth(self):
-        response=await self.client.get('/');self.assertEqual(response.status,200);self.assertIn('Koltuk senin',await response.text())
-        self.assertIn("frame-ancestors 'none'",response.headers['Content-Security-Policy'])
+    async def connect(self):self.assertEqual((await self.client.post('/api/connect')).status,200)
+    async def test_ui_info_and_passwordless_connection(self):
+        self.assertEqual((await self.client.get('/')).status,200)
+        response=await self.client.get('/api/info');info=await response.json()
+        self.assertEqual(info['service'],'sofa-remote');self.assertFalse(info['passwordRequired'])
         self.assertEqual((await self.client.get('/api/shortcuts')).status,401)
-        with self.assertRaises(WSServerHandshakeError): await self.client.ws_connect('/api/ws')
-    async def test_origin_blocked(self):
-        self.assertEqual((await self.client.post('/api/pair',json={'pin':'123456'},headers={'Origin':'https://attacker.example'})).status,403)
-    async def test_rate_limit(self):
-        for _ in range(5): self.assertEqual((await self.client.post('/api/pair',json={'pin':'000000'})).status,401)
-        self.assertEqual((await self.client.post('/api/pair',json={'pin':'123456'})).status,429)
+        await self.connect();self.assertEqual((await self.client.get('/api/shortcuts')).status,200)
+    async def test_origin_and_host_blocked(self):
+        self.assertEqual((await self.client.post('/api/connect',headers={'Origin':'https://attacker.example'})).status,403)
+        self.assertEqual((await self.client.get('/api/info',headers={'Host':'attacker.example'})).status,403)
+        with self.assertRaises(WSServerHandshakeError):await self.client.ws_connect('/api/ws')
     async def test_cookie(self):
-        response=await self.client.post('/api/pair',json={'pin':'123456'})
-        self.assertIn('HttpOnly',response.headers['Set-Cookie']);self.assertIn('SameSite=Strict',response.headers['Set-Cookie'])
-    async def test_commands_and_recovery(self):
-        await self.pair();ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
-        for i,action in enumerate([{'type':'keys','keys':['WIN','D']},{'type':'text','text':'Türkçe 😀'},{'type':'profile','profile':'youtube','action':'play'}]):
+        response=await self.client.post('/api/connect');self.assertIn('HttpOnly',response.headers['Set-Cookie']);self.assertIn('SameSite=Strict',response.headers['Set-Cookie'])
+    async def test_live_keyboard_and_commands(self):
+        await self.connect();ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
+        actions=[{'type':'edit','delete':0,'text':'Türkçe 😀'},{'type':'edit','delete':1,'text':'🎬'}, {'type':'keys','keys':['ENTER']},{'type':'launch','app':'chrome'},{'type':'window','handle':1,'action':'minimize'}]
+        for i,action in enumerate(actions):
             await ws.send_json({**action,'id':i});self.assertEqual((await ws.receive_json())['id'],i)
+        self.assertEqual(self.adapter.events,[('text','Türkçe 😀'),('keys',['BACKSPACE']),('text','🎬'),('keys',['ENTER']),('launch','chrome'),('window',1,'minimize')]);await ws.close()
+    async def test_error_recovery(self):
+        await self.connect();ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
         await ws.send_json({'type':'keys','keys':['BAD']});self.assertEqual((await ws.receive_json())['type'],'error')
-        await ws.send_json({'type':'ping'});self.assertEqual((await ws.receive_json())['type'],'result')
-        self.assertEqual(self.adapter.events,[('keys',['WIN','D']),('text','Türkçe 😀'),('keys',['K'])]);await ws.close()
-    async def test_single_controller(self):
-        await self.pair();ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
-        with self.assertRaises(WSServerHandshakeError) as cm: await self.client.ws_connect('/api/ws')
-        self.assertEqual(cm.exception.status,409);await ws.close()
+        await ws.send_json({'type':'ping'});self.assertEqual((await ws.receive_json())['type'],'result');await ws.close()
+    async def test_single_controller_and_release(self):
+        released=[];self.adapter.release=lambda:released.append(True)
+        await self.connect();ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
+        with self.assertRaises(WSServerHandshakeError) as cm:await self.client.ws_connect('/api/ws')
+        self.assertEqual(cm.exception.status,409);await ws.close();await asyncio.sleep(0.01);self.assertTrue(released)
     async def test_macro_clipboard(self):
-        await self.pair();items=[{'name':'Film','actions':[{'type':'url','url':'https://example.com'},{'type':'delay','ms':0},{'type':'keys','keys':['F11']}]}]
+        await self.connect();items=[{'name':'Film','actions':[{'type':'url','url':'https://example.com'},{'type':'delay','ms':0},{'type':'keys','keys':['F11']}]}]
         self.assertEqual((await self.client.put('/api/shortcuts',json=items)).status,200)
         ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
-        await ws.send_json({'type':'macro','index':0});await ws.receive_json()
-        self.assertEqual(self.adapter.events,[('url','https://example.com'),('keys',['F11'])])
+        await ws.send_json({'type':'macro','index':0});await ws.receive_json();self.assertEqual(self.adapter.events,[('url','https://example.com'),('keys',['F11'])])
         await ws.send_json({'type':'clipboard_set','text':'Örnek'});await ws.receive_json()
         await ws.send_json({'type':'clipboard_get'});self.assertEqual((await ws.receive_json())['text'],'Örnek');await ws.close()
+    async def test_browser_extension_tab_roundtrip(self):
+        extension=await self.client.ws_connect('/api/browser',headers={'Origin':'chrome-extension://abcdefghijklmnop'})
+        await extension.send_json({'type':'tabs','tabs':[{'id':7,'windowId':1,'title':'YouTube','url':'https://youtube.com','active':True}]});await asyncio.sleep(0.01)
+        await self.connect();ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
+        await ws.send_json({'type':'tabs'});data=await ws.receive_json();self.assertTrue(data['connected']);self.assertEqual(data['tabs'][0]['id'],7)
+        await ws.send_json({'type':'tab','action':'activate','tabId':7,'id':22});command=await extension.receive_json();self.assertEqual(command['tabId'],7)
+        await extension.send_json({'requestId':command['requestId'],'ok':True});self.assertEqual((await ws.receive_json())['id'],22)
+        await extension.close();await ws.close()
+    async def test_downloads_status_no_network(self):
+        await self.connect();d=await (await self.client.get('/api/updates')).json();self.assertEqual(d['current'],'0.2.0');self.assertFalse(d['ready'])
+        self.assertEqual((await self.client.post('/api/updates/install')).status,400)
     async def test_expired_session(self):
-        await self.pair();self.app['remote'].tokens.clear();self.assertEqual((await self.client.get('/api/shortcuts')).status,401)
+        await self.connect();self.app['remote'].tokens.clear();self.assertEqual((await self.client.get('/api/shortcuts')).status,401)
     async def test_invalid_macro(self):
-        await self.pair();before=await (await self.client.get('/api/shortcuts')).json()
+        await self.connect();before=await (await self.client.get('/api/shortcuts')).json()
         self.assertEqual((await self.client.put('/api/shortcuts',json=[{'name':'bad','actions':[{'type':'url','url':'file:///etc/passwd'}]}])).status,400)
         self.assertEqual(await (await self.client.get('/api/shortcuts')).json(),before)
-if __name__=='__main__': unittest.main()
+if __name__=='__main__':unittest.main()

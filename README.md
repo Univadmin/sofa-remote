@@ -1,106 +1,71 @@
 # Sofa Remote
 
-Windows 10/11’e bağlı TV için Türkçe, yerel ağ üzerinden çalışan mobil kumanda. Reklam, abonelik veya bulut hesabı yok. **İlk sürüm / v0.1.0**: evde gerçek Windows + telefon testi gerekir.
+Windows bilgisayarını telefondan kontrol et. Mouse, klavye, medya ve tarayıcı kumandalarını aynı ekranda birleştir.
 
-## Özellikler
+**[↓ Downloads](https://github.com/Univadmin/sofa-remote/releases/latest)** · [Tüm sürümler](https://github.com/Univadmin/sofa-remote/releases) · [Kurulum](#kurulum)
 
-- Touchpad: göreli hareket, tıklama, çift dokunuşla çift tık, sağ/orta tık, iki parmakla kaydırma, sürükleme, solak modu, hız ayarı.
-- Türkçe ve emoji dahil Unicode metin girişi. Telefon klavyesi destekliyorsa mikrofonla yazdırma.
-- Ctrl / Alt / Shift / Win birleşimleri, F1–F12, gezinme tuşları, elle kısayol girişi.
-- Sistem sesi, sessiz, medya tuşları; genel site, YouTube ve Netflix klavye profilleri.
-- Tarayıcı sekmeleri, adres çubuğu, geri/ileri, yenileme, tam ekran, pencere değiştirme.
-- Site düğmeleri; metin, tuş, adres ve bekleme adımlarından oluşan özel makrolar. JSON ile yedekleme ve düzenleme.
-- PC ekranının manuel JPEG önizlemesi, açık pencereleri listeleme ve öne getirme.
-- İstek üzerine iki yönlü **metin** panosu aktarımı; otomatik pano izleme yapılmaz.
-- Sunum kontrolü, kilitleme, 30 saniye gecikmeli kapatma/yeniden başlatma ve iptal.
-- 6 haneli eşleştirme, giriş denemesi sınırı, 24 saatlik oturum, yeniden bağlantı, tek aktif kontrolcü.
-- Android APK kabuğu; iPhone/Android tarayıcı arayüzü. APK bilgisayardaki arayüzü yükler, internet sunucusuna ihtiyaç duymaz.
+## Downloads
 
-## Windows’ta başlatma
+| Platform | İndir |
+|---|---|
+| Windows 10 / 11 | [SofaRemote.exe](https://github.com/Univadmin/sofa-remote/releases/latest/download/SofaRemote.exe) |
+| Android 8+ | [SofaRemote-Android.apk](https://github.com/Univadmin/sofa-remote/releases/latest/download/SofaRemote-Android.apk) |
+| Chrome / Edge sekme eklentisi | [SofaRemote-Browser.zip](https://github.com/Univadmin/sofa-remote/releases/latest/download/SofaRemote-Browser.zip) |
 
-### Hazır EXE ve Android APK
+APK ve EXE sürüm numaraları, dosya boyutları ve önceki sürümler [Downloads sayfasında](https://github.com/Univadmin/sofa-remote/releases) bulunur. Uygulama içinde de **Downloads** alanı vardır.
 
-GitHub **Actions → Test and build → başarılı çalışma → Artifacts** bölümünden:
+## Kurulum
 
-- `Sofa-Remote-Windows`: ZIP içindeki `SofaRemote.exe` dosyasını çalıştır.
-- `Sofa-Remote-Android-debug`: APK’yi Android telefonuna kur. Bu bir geliştirme imzalı APK’dir; Play Store sürümü değildir. Sonraki derlemelerin debug imzası değişebilir; gerektiğinde önce eski APK’yi kaldır.
+1. Windows’ta **SofaRemote.exe** dosyasını çalıştır. Pencere açık kalsın.
+2. Telefon ve bilgisayarı aynı ev ağına bağla. Windows güvenlik duvarı sorarsa özel ev ağına izin ver.
+3. Android APK’yi kur ve aç. Son bilgisayara otomatik bağlanmayı dener; bulunamazsa ağı tarar. Listelenen bilgisayara dokun. Şifre gerekmez.
+4. iPhone’da Windows penceresindeki yerel adresi Safari ile aç. Otomatik ağ keşfi ve fiziksel ses tuşları Android uygulamasındadır.
 
-Windows uygulaması bir konsol penceresinde bilgisayar adresini, QR kodunu ve eşleştirme kodunu gösterir. Pencereyi açık tut. EXE imzalı değildir; kaynak koddan çalıştırma seçeneği aşağıdadır.
+Ağ keşfi UDP 8766, kumanda bağlantısı TCP 8765 kullanır. Broadcast engellenirse Android yerel ağında sınırlı adres taraması yapar. Misafir Wi-Fi, istemci izolasyonu veya güvenlik duvarı keşfi engelleyebilir; Cihazlar bölümünden adresle bağlantı da yapılabilir.
 
-### Kaynaktan
+### v0.1 kullananlar
 
-1. Python 3.11+ kur (Python 3.12 önerilir).
-2. Repo ZIP’ini indirip çıkart veya klonla.
-3. `scripts/start-windows.cmd` dosyasını çalıştır. İlk çalıştırmada bağımlılıklar indirilir.
-4. Windows Güvenlik Duvarı sorarsa yalnızca **özel ev ağı** için izin ver.
-5. Telefonunu aynı Wi-Fi ağına bağla. Konsolda çıkan `http://192.168.x.x:8765` adresini telefonda aç veya QR kodunu okut.
-6. Altı haneli kodla eşleştir. Android uygulamasında da önce aynı bilgisayar adresini gir.
+v0.2 Android uygulaması yeni, genel bir paket kimliği ve kalıcı yayın imzası kullanır. v0.1 APK’sinin yerine bir kez yeni APK’yi kur; dilersen eski uygulamayı kaldır. Bundan sonraki APK güncellemeleri aynı paket ve imzayla gelir. Windows için yeni EXE’yi indirip eski programı kapattıktan sonra çalıştır.
 
-iPhone: Safari ile adresi aç, istersen Paylaş → Ana Ekrana Ekle kullan. Bu sürümde native iOS IPA yok. HTTP üzerinde tarayıcıların tam PWA/çevrimdışı kurulum özellikleri sınırlıdır; normal web kumandası çalışır. Sunucu çalışmadan uygulama kontrol sağlayamaz.
+## İki kumanda, tek ekran
 
-Otomatik başlatma isteğe bağlıdır: PowerShell’de `scripts/enable-startup.ps1` çalıştır. Kaldırmak için Windows Başlangıç klasöründeki Sofa Remote kısayolunu sil. Ayarlar `%LOCALAPPDATA%/SofaRemote/shortcuts.json` dosyasında saklanır. Sunucu yeniden başladığında eşleştirme kodu ve oturumlar yenilenir.
+Ekran iki sabit alana ayrılır. Her alanın üstündeki listeden bağımsız kumanda seç: **Mouse + Medya**, **Klavye + Tarayıcı**, **Mouse + Uygulamalar** gibi. Düzen düğmesiyle üst üste veya yan yana görünümü seç. Tercihler hatırlanır; paneller kendi içlerinde kayar.
 
-## Medya kullanımı
+- **Mouse:** touchpad, sol/sağ/orta tık, iki parmak kaydırma, sürükleme, hız ve solak ayarı.
+- **Klavye:** telefon klavyesiyle anlık yazma, silme, Enter; Ctrl/Alt/Shift/Win, F1–F12 ve özel birleşimler. Yazı alanında yapılan değişiklikler PC’deki odaklanmış alana gönderilir. PC imlecini başka yolla taşırsan **Yeni alan** düğmesine dokun.
+- **Medya:** ses, sessiz, oynat/duraklat; genel site, YouTube ve Netflix profilleri. Android uygulaması ön plandayken telefonun ses düğmeleri PC sesini değiştirir.
+- **Tarayıcı / Sekmeler:** gezinme, sekme açma/kapatma/geçiş; eklenti bağlıysa sekmeleri adlarıyla listeleme, doğrudan seçme, yenileme ve kopyalama.
+- **Uygulamalar:** açık pencerelere geçiş, küçültme, büyütme, kapatma; Chrome, Edge, Firefox, Dosya Gezgini ve Hesap Makinesi başlatma.
+- **Tüm butonlar:** aranabilir komut kataloğu. Desteklenen komutlar `+` düğmesiyle kısayola eklenebilir.
+- **Araçlar:** ekran önizlemesi, iki yönlü metin panosu ve güç işlemleri.
 
-Tarayıcıda videoyu açıp bir kez videoya tıkla. Medya panelinden uygun profili seç. YouTube’da K/J/L, Netflix’te Space/ok tuşları gönderilir. Genel sitelerde oynatıcının klavye desteği gerekir. Reklam penceresi, adres çubuğu veya başka pencere odaktaysa komut oraya gider. Her üçüncü parti oynatıcı için evrensel kontrol garantisi yoktur. Netflix altyazı kısayolu ve zaman atlama miktarı oynatıcıya bağlıdır. Gerekirse mouse ve klavyeyi kullan.
+Üst kısayol şeridi isimler yerine sitenin sembolünü gösterir. Sembol bulunamazsa yedek simge kullanılır; düğmenin erişilebilir adı ve açıklaması korunur. Site simgeleri ilgili sitenin `/favicon.ico` adresinden alınır. Özel makrolara kendi sembolünü verebilirsin.
 
-F1–F12 desteklenir; fiziksel klavyenin donanıma özgü Fn tuşu taklit edilmez. Ekran önizlemesi video yayını değildir; DRM korumalı video siyah görünebilir. Windows kilit ekranı, UAC güvenli masaüstü veya yönetici uygulamaları normal kullanıcı girdisini engelleyebilir. Kilitleme sonrası telefonla oturum açmayı bekleme.
+## Tarayıcı sekmelerini listeleme
 
-## Makro örneği
+Windows’ta Chrome veya Edge için:
 
-Araçlar → Gelişmiş makro bölümündeki listeye eklenebilir:
+1. Browser ZIP’ini indir ve klasöre çıkart.
+2. `chrome://extensions` veya `edge://extensions` sayfasını aç, Geliştirici modunu etkinleştir.
+3. **Paketlenmemiş öğe yükle** ile çıkarttığın klasörü seç.
 
-```json
-{
-  "name": "YouTube aç",
-  "actions": [
-    {"type": "url", "url": "https://www.youtube.com"},
-    {"type": "delay", "ms": 800},
-    {"type": "keys", "keys": ["F11"]}
-  ]
-}
-```
+Eklenti yalnızca aynı bilgisayardaki Sofa Remote sunucusuna bağlanır. Telefonun Tarayıcı panelindeki **Yenile** düğmesi açık sekmeleri getirir. Sekme adları ve adresleri ev ağındaki bağlı kumandaya gösterilir. Eklentisiz temel tarayıcı kısayolları kullanılabilir.
 
-F11 mevcut tarayıcı durumunu tersine çevirir; her zaman tam ekrana geçirmez. Sayfanın açılma hızı değişebilir. Kısayol silme ve JSON yedek içeriğini geri yapıştırarak yükleme desteklenir. Eşleşen cihazlar kısayolları değiştirebilir.
+## Güncellemeler
 
-## Bağlantı ve gizlilik
+- Windows ve Android açılışta GitHub’daki son kararlı sürümü kontrol eder.
+- Paketli Windows uygulaması yeni EXE’yi otomatik indirip SHA-256 değerini doğrular. Downloads → **PC güncellemesini uygula** ile program yeniden başlatılır. Önceki EXE yedeği saklanır.
+- Android yeni APK’yi Wi-Fi üzerinden indirip SHA-256 değerini doğrular. Downloads → **Android güncellemesini kur** Android’in standart kurulum onayını açar. Gerekirse bu uygulamadan yüklemeye bir defa izin verilir. Sessiz kurulum yapılmaz.
+- İnternet yokken yerel kumanda çalışmaya devam eder. Güncelleme denetimi başarısızsa daha sonra tekrar denenebilir.
 
-Kontrol WebSocket üzerinden doğrudan ev ağında gider. PC’nin Ethernet ile bağlanması önerilir. Misafir Wi-Fi / cihaz izolasyonu bağlantıyı engeller. Çoklu ağ kartında konsoldaki IP yanlışsa `ipconfig` ile ev ağı IPv4 adresini kullan.
+## Kullanım bilgileri
 
-Varsayılan HTTP bağlantısı **şifrelenmez**; kod, metin ve ekran yalnızca güvendiğin ev ağında kullanılmalıdır. Modemde port yönlendirme açma. TLS için güvenilir bir sertifika ile:
+Bağlantı şifresizdir: aynı yerel ağdaki cihazlar PC’yi kontrol edebilir. Varsayılan HTTP trafiği şifrelenmez. Güvendiğin ev ağında kullan; modemde port yönlendirme açma. İsteğe bağlı TLS sunucu seçenekleri `--tls-cert` ve `--tls-key` ile kullanılabilir; Android otomatik keşfi varsayılan HTTP adreslerini bulur.
 
-```sh
-python -m server.app --tls-cert server.crt --tls-key server.key
-```
+Medya komutları aktif pencereye gider; oynatıcıya önce tıkla. Üçüncü parti sitelerin kısayol desteği değişir. DRM korumalı içerik ekran önizlemesinde siyah görünebilir. Windows kilit ekranı ve UAC masaüstü uzaktan yazmayı engeller. Fiziksel donanım Fn tuşu yerine F1–F12 gönderilir.
 
-Mobil cihazın sertifikaya güvenmesi gerekir; Android kabuğu sertifika hatalarını atlamaz. Eşleştirme kodu telefon URL’sine veya QR koduna konulmaz. Pano ve ekran sadece düğmeye basıldığında okunur; telemetri yoktur. Sunucuyu kapatmak tüm oturumları iptal eder.
+## Kaynaktan çalıştırma
 
-## Geliştirme ve test
-
-```sh
-python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-python -m unittest discover -s tests -v
-node --check web/app.js
-python -m server.app --dry-run
-```
-
-Dry-run hiçbir işletim sisteminde gerçek giriş, pano, güç veya site açma işlemi yapmaz. Komutlar belleğe kaydedilir. Windows ekran görüntüsü demo modunda kapalıdır. CI Linux ve Windows’ta protokol testleri, Android APK ve Windows EXE derlemesi yapar. Gerçek input enjeksiyonu ve Android/iOS cihaz testi ayrıca gerekir.
-
-Android: JDK 17, Android SDK 35, Gradle 8.11.1 ile `gradle -p android assembleDebug`. Python sunucusunun web klasörü EXE’ye PyInstaller ile dahil edilir.
-
-### Bu sürümün dışında
-
-Bluetooth, jiroskop mouse, telefonun fiziksel ses düğmeleri, resim/dosya panosu, dosya yöneticisi, Wake-on-LAN, otomatik video algılama, native iOS uygulaması ve mağaza yayını bu sürümde yoktur. PC kapalıyken kumanda sunucusu da çalışmaz. Üçüncü parti uygulamaların kodu veya marka görselleri kopyalanmamıştır.
-
-## İncelenen ürün özellikleri
-
-Özellik kapsamı için [Remote Mouse](https://play.google.com/store/apps/details?id=com.hungrybolo.remotemouseandroid) ve [Unified Remote](https://www.unifiedremote.com/features) listeleri incelendi. Bu proje bağımsızdır.
-
-Android kabuğunda yedek dışa aktarma JSON metnini seçer; kopyalayarak saklayabilirsin. Tarayıcıda JSON dosyası indirilir.
-
-![Sofa Remote arayüzü](docs/preview.png)
+Python 3.11+ kurulu Windows’ta `scripts/start-windows.cmd` dosyasını çalıştır. İsteğe bağlı otomatik açılış için `scripts/enable-startup.ps1` kullanılabilir. Kısayollar `%LOCALAPPDATA%/SofaRemote/shortcuts.json` içinde tutulur.
 
 MIT lisansı.

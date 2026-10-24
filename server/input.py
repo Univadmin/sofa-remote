@@ -28,6 +28,8 @@ class DryRun:
         return getattr(self, 'clip', '')
     def windows(self): return []
     def focus(self, handle): raise ValueError('Windows requires a Windows host')
+    def launch(self, app): self.events.append(('launch',app))
+    def window(self, handle, action): self.events.append(('window',handle,action))
     def power(self, action): self.events.append(('power', action))
     def release(self): pass
 
@@ -121,6 +123,28 @@ class Windows:
         if handle not in {w['id'] for w in self.windows()}: raise ValueError('Window no longer available')
         self.u.ShowWindow(wintypes.HWND(handle),9)
         if not self.u.SetForegroundWindow(wintypes.HWND(handle)): raise RuntimeError('Windows refused focus; use Alt+Tab')
+    def launch(self, app):
+        import subprocess
+        import shutil
+        import winreg
+        names={'chrome':'chrome.exe','edge':'msedge.exe','firefox':'firefox.exe','explorer':'explorer.exe','calculator':'calc.exe'}
+        exe=names[app];path=shutil.which(exe)
+        if not path:
+            for hive in (winreg.HKEY_CURRENT_USER,winreg.HKEY_LOCAL_MACHINE):
+                try:
+                    with winreg.OpenKey(hive,'SOFTWARE'+chr(92)+'Microsoft'+chr(92)+'Windows'+chr(92)+'CurrentVersion'+chr(92)+'App Paths'+chr(92)+exe) as key:
+                        path=winreg.QueryValue(key,None)
+                    break
+                except OSError: continue
+        if not path or not os.path.isfile(path): raise ValueError('Uygulama kurulu değil')
+        subprocess.Popen([path])
+    def window(self, handle, action):
+        if handle not in {w['id'] for w in self.windows()}: raise ValueError('Pencere artık açık değil')
+        hwnd=wintypes.HWND(handle)
+        if action=='close':
+            self.u.PostMessageW.argtypes=[wintypes.HWND,wintypes.UINT,wintypes.WPARAM,wintypes.LPARAM]
+            self.u.PostMessageW(hwnd,0x0010,0,0)
+        else: self.u.ShowWindow(hwnd,{'minimize':6,'maximize':3,'restore':9}[action])
     def power(self, action):
         import subprocess
         if action == 'lock':

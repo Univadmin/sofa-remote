@@ -1,7 +1,10 @@
-name: Test and build
+name: Build
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -15,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check web/app.js
+      - run: node --check web/app.js && node --check browser/background.js
   android:
     runs-on: ubuntu-latest
     steps:
@@ -31,11 +34,27 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - run: gradle -p android assembleDebug
+      - name: Prepare signing
+        if: github.event_name != 'pull_request'
+        env:
+          STORE: ${{ secrets.SOFA_SIGNING_STORE }}
+        run: printf '%s' "$STORE" | base64 --decode > android/app/release.p12
+      - name: Build APK
+        if: github.event_name != 'pull_request'
+        env:
+          SOFA_STORE_PASSWORD: ${{ secrets.SOFA_STORE_PASSWORD }}
+        run: |
+          gradle -p android testDebugUnitTest assembleRelease
+          mkdir -p dist
+          cp android/app/build/outputs/apk/release/app-release.apk dist/SofaRemote-Android.apk
+      - name: Test pull request
+        if: github.event_name == 'pull_request'
+        run: gradle -p android testDebugUnitTest assembleDebug
       - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
         with:
-          name: Sofa-Remote-Android-debug
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: Sofa-Remote-Android
+          path: dist/SofaRemote-Android.apk
   windows:
     runs-on: windows-latest
     steps:
@@ -46,7 +65,33 @@ jobs:
       - run: pip install -r requirements.txt pyinstaller
       - run: python -m unittest discover -s tests -v
       - run: pyinstaller --noconfirm --onefile --name SofaRemote --collect-all aiohttp --add-data "web;web" run.py
+      - name: Verify packaged server
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath dist/SofaRemote.exe -ArgumentList '--dry-run','--host','127.0.0.1','--port','18765','--state-dir',"$env:RUNNER_TEMP/sofa-state" -PassThru
+          try {
+            $ready = $false
+            for ($i=0; $i -lt 30; $i++) {
+              Start-Sleep -Seconds 1
+              try {
+                $info = Invoke-RestMethod http://127.0.0.1:18765/api/info
+                if ($info.service -eq 'sofa-remote') { $ready = $true; break }
+              } catch {}
+            }
+            if (!$ready) { throw 'Packaged server did not start' }
+            $page = Invoke-WebRequest http://127.0.0.1:18765/
+            if ($page.StatusCode -ne 200) { throw 'Web UI missing' }
+          } finally { Stop-Process -Id $process.Id -ErrorAction SilentlyContinue }
       - uses: actions/upload-artifact@v4
         with:
           name: Sofa-Remote-Windows
           path: dist/SofaRemote.exe
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cd browser && zip -r ../SofaRemote-Browser.zip manifest.json background.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sofa-Remote-Browser
+          path: SofaRemote-Browser.zip
