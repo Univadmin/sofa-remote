@@ -34,6 +34,14 @@ public class MainActivity extends Activity {
         web.getSettings().setJavaScriptEnabled(true);web.getSettings().setDomStorageEnabled(true);
         web.getSettings().setAllowFileAccess(false);web.getSettings().setAllowContentAccess(false);
         web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        web.setWebChromeClient(new WebChromeClient(){
+            @Override public boolean onJsConfirm(WebView view,String url,String message,JsResult result){
+                new AlertDialog.Builder(MainActivity.this).setMessage(message)
+                    .setPositiveButton("Onayla",(d,w)->result.confirm())
+                    .setNegativeButton("İptal",(d,w)->result.cancel())
+                    .setOnCancelListener(d->result.cancel()).show();return true;
+            }
+        });
         web.setWebViewClient(new WebViewClient(){
             @Override public boolean shouldOverrideUrlLoading(WebView view,WebResourceRequest request){
                 try {return !new URI(server).resolve("/").equals(new URI(request.getUrl().toString()).resolve("/"));}catch(Exception e){return true;}

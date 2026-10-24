@@ -70,7 +70,7 @@ class Remote:
     def authorized(self, token): return self.tokens.get(token,0)>time.monotonic()
     def load_shortcuts(self):
         path=self.state/'shortcuts.json'
-        if path.exists(): return json.loads(path.read_text())
+        if path.exists(): return json.loads(path.read_text(encoding='utf-8'))
         return [{'name':'YouTube','actions':[{'type':'url','url':'https://www.youtube.com'}]}, {'name':'Netflix','actions':[{'type':'url','url':'https://www.netflix.com'}]}]
     def save_shortcuts(self, items):
         if not isinstance(items,list) or len(items)>60: raise ValueError('At most 60 shortcuts')
