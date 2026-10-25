@@ -1,7 +1,7 @@
 /* Playback checks run only on tabs explicitly opened by a film command. */
 'use strict';
 (()=>{
- let control=null,timer=null,selected=null,firstPosition=null,advances=0,reported=false,armed=false,clickedPlay=false;const styles=new Map();
+ let control=null,timer=null,selected=null,firstPosition=null,advances=0,reported=false,armed=false,clickedPlay=false;const prepared=new WeakSet();const styles=new Map();
  const norm=s=>String(s||'').toLocaleLowerCase('tr').normalize('NFKD').replace(/[^\p{L}\p{N}]/gu,'');
  const unavailable=/bu (?:video|içerik|yapım) (?:şu anda )?(?:kullanılamıyor|izlenemiyor|mevcut değil)|ülkenizde (?:mevcut|kullanılabilir) değil|bulunduğunuz (?:bölgede|konumda).*?(?:mevcut değil|izlenemiyor)|not available in your (?:country|region|location)|this (?:video|title|content) is (?:currently )?(?:unavailable|not available)|video unavailable/i;
  function signal(state,extra={}){chrome.runtime.sendMessage({type:'movie-state',requestId:control.requestId,state,...extra}).catch(()=>{})}
@@ -44,18 +44,21 @@
   const alerts=[...document.querySelectorAll('[role="alert"],.error-message,.player-error,[data-uia*="error"]')].map(e=>e.innerText||'').join(' ');
   const bodyText=document.body?.innerText||'';
   if(unavailable.test(alerts)||window===window.top&&bodyText.length<2500&&unavailable.test(bodyText))return finish('unavailable',{reason:'Bu video mevcut oturumda veya bölgede kullanılamıyor'});
-  const candidates=videos().filter(matches);const video=candidates.find(v=>!v.paused)||candidates[0];
+  const all=videos();
+  if(control.titleConfirmed)for(const v of all)if(!prepared.has(v)){prepared.add(v);v.muted=true;v.preload='auto';if(v.readyState===0&&(v.currentSrc||v.getAttribute('src')||v.querySelector('source')))v.load();v.play().catch(()=>{});}
+  const candidates=all.filter(matches);const video=candidates.find(v=>!v.paused)||candidates[0];
   if(!video){
-   if(!clickedPlay&&control.titleConfirmed){const button=document.querySelector('[data-uia="play-button"],[data-testid="play-button"],button[aria-label="Play"],button[aria-label="Oynat"]');
+   if(!clickedPlay&&control.titleConfirmed){const button=document.querySelector('[data-uia="play-button"],[data-testid="play-button"],button[aria-label="Play"],button[aria-label="Oynat"],.vjs-big-play-button,.jw-icon-display,.plyr__control--overlaid,[data-plyr="play"]');
     const label=(button?.getAttribute('aria-label')||button?.textContent||'').trim();
-    if(button&&/^(play|oynat|filmi oynat|play movie|watch now|şimdi izle|resume|devam et)$/i.test(label)){clickedPlay=true;button.click()}
+    if(button&&(button.matches('.vjs-big-play-button,.jw-icon-display,.plyr__control--overlaid,[data-plyr="play"]')||/^(play|oynat|filmi oynat|play movie|watch now|şimdi izle|resume|devam et)$/i.test(label))){clickedPlay=true;button.click()}
    }
    return;
   }
   if(selected&&selected!==video){firstPosition=null;advances=0;}selected=video;
   if(video.error)return finish('unavailable',{reason:'Video kaynağı oynatılamıyor'});
   const tracks=[...video.textTracks],tr=tracks.find(t=>/^tr(?:-|$)|^tur$/i.test(t.language));
-  if(!tr&&!control.turkish_subtitles)return;
+  const turkishAudio=[...(video.audioTracks||[])].some(t=>t.enabled&&/^tr(?:-|$)|^tur$/i.test(t.language));
+  if(!tr&&!control.turkish_subtitles&&!control.movie.turkish_original)return;
   if(tr){for(const t of tracks)if(t!==tr)t.mode='disabled';tr.mode='showing'}
   if(video.readyState<2)return;
   if(firstPosition===null){firstPosition=video.currentTime;
@@ -64,7 +67,7 @@
    return;
   }
   if(!video.paused&&!video.ended&&!video.seeking&&video.currentTime>firstPosition+.25)advances++;else advances=0;
-  if(advances>=2&&(control.mode==='probe'||!video.muted))finish(control.mode==='probe'?'playable':'playing',{duration:video.duration,turkish_subtitles:true,fullscreen:!!document.fullscreenElement,position:video.currentTime});
+  if(advances>=2&&(control.mode==='probe'||!video.muted))finish(control.mode==='probe'?'playable':'playing',{duration:video.duration,turkish_subtitles:!!tr||!!control.turkish_subtitles,turkish_audio:turkishAudio,fullscreen:!!document.fullscreenElement,position:video.currentTime});
  }
  chrome.runtime.onMessage.addListener(message=>{
   if(message.type==='movie-stop'){stop();return;}

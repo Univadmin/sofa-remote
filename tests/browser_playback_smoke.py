@@ -33,13 +33,15 @@ async def main():
         else:
             source='trailer' if path=='/info' else 'movie'
             body=f'<h1>Fixture Movie</h1><video controls muted preload="auto" style="width:320px" src="/{source}.webm"><track default kind="subtitles" srclang="tr" src="/sub.vtt"></video>'
+        if path=='/lazy':body=body.replace('preload="auto"','preload="none"')
+        if path=='/turkish':body=body.replace('<track default kind="subtitles" srclang="tr" src="/sub.vtt">','')
         title='Player' if path=='/inner' else 'Fixture Movie'
         return web.Response(text=f'<!doctype html><title>{title}</title>{body}',content_type='text/html')
     app=web.Application();app.router.add_get('/api/browser',browser);app.router.add_get('/{path:.*}',page)
     runner=web.AppRunner(app);await runner.setup();await web.TCPSite(runner,'0.0.0.0',8765).start()
-    async def command(kind,path,timeout=12000):
+    async def command(kind,path,timeout=12000,turkish=False):
         ident=str(len(pending)+1);future=asyncio.get_running_loop().create_future();pending[ident]=future
-        await socket.send_json({'type':kind,'requestId':ident,'url':'http://127.0.0.1:8765'+path,'movie':{'title':'Fixture Movie','original_title':'Fixture Movie','runtime':20},'turkish_subtitles':False,'timeout':timeout})
+        await socket.send_json({'type':kind,'requestId':ident,'url':'http://127.0.0.1:8765'+path,'movie':{'title':'Fixture Movie','original_title':'Fixture Movie','runtime':20,'turkish_original':turkish},'turkish_subtitles':False,'timeout':timeout})
         return await asyncio.wait_for(future,timeout/1000+10)
     try:
         async with async_playwright() as playwright:
@@ -51,6 +53,10 @@ async def main():
                 result=await command('movie-probe','/movie');assert result.get('ok'),result
                 assert result['duration']>=1200 and result['turkish_subtitles'];assert len(context.pages)==initial
                 print('Real Chromium: advancing full-length video verified; silent probe tab closed',flush=True)
+                result=await command('movie-probe','/lazy');assert result.get('ok'),result
+                result=await command('movie-probe','/turkish',turkish=True);assert result.get('ok') and not result['turkish_subtitles'],result
+                result=await command('movie-probe','/turkish',3000);assert result.get('error'),result
+                print('Real Chromium: lazy metadata loads; Turkish original plays without subtitles; foreign movie rejected without subtitles',flush=True)
                 for path in ('/info','/blocked'):
                     result=await command('movie-probe',path,3000);assert result.get('error'),result
                 print('Real Chromium: trailer/info page and unavailable-region page excluded',flush=True)

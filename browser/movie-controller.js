@@ -24,10 +24,12 @@ async function movieCommand(d){
   const url=new URL(d.url);if(!['https:','http:'].includes(url.protocol))throw new Error('Geçersiz video adresi');
   const mode=d.type==='movie-play'?'play':'probe';const tab=await chrome.tabs.create({url:'about:blank',active:mode==='play'});
   const job={...d,mode,tabId:tab.id,frameId:null};movieJobs.set(d.requestId,job);
+  job.timer=setTimeout(()=>movieFinish(job,{error:'Film süresine uygun, oynatım doğrulanamadı'}),Math.min(22000,Math.max(3000,d.timeout||18000)));
   await chrome.tabs.update(tab.id,{muted:true,url:url.href});
+  if(!movieJobs.has(d.requestId))return;
   job.windowId=tab.windowId;
   if(mode==='play'){job.previousState=(await chrome.windows.get(tab.windowId)).state;await chrome.windows.update(tab.windowId,{focused:true,state:'fullscreen'});}
-  job.timer=setTimeout(()=>movieFinish(job,{error:'Film süresine uygun, Türkçe altyazılı oynatım doğrulanamadı'}),Math.min(22000,Math.max(3000,d.timeout||18000)));
+
   job.retry=setInterval(()=>movieKick(job),1200);movieKick(job);
  }catch(e){const job=movieJobs.get(d.requestId);if(job)await movieFinish(job,{error:e.message});else if(socket?.readyState===1)socket.send(JSON.stringify({requestId:d.requestId,error:e.message}));}
 }
@@ -44,7 +46,7 @@ chrome.runtime.onMessage.addListener(async(message,sender)=>{
   if(socket?.readyState===1)socket.send(JSON.stringify({type:'movie-gesture',requestId:job.requestId}));
  }else if(message.state==='playable'&&job.mode==='probe'||message.state==='playing'&&job.mode==='play'){
   const tab=await chrome.tabs.get(job.tabId);
-  await movieFinish(job,{ok:true,tabId:job.tabId,url:tab.url,duration:message.duration,turkish_subtitles:message.turkish_subtitles===true,fullscreen:job.mode==='play'});
+  await movieFinish(job,{ok:true,tabId:job.tabId,url:tab.url,duration:message.duration,turkish_subtitles:message.turkish_subtitles===true,turkish_audio:message.turkish_audio===true,fullscreen:job.mode==='play'});
  }else if(message.state==='unavailable'&&(sender.frameId===0||job.frameId===sender.frameId))await movieFinish(job,{error:message.reason||'Bu video kullanılamıyor'});
 });
 

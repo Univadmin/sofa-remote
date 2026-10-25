@@ -290,6 +290,10 @@ async def movies(request):
         data=await request.json()
         if not isinstance(data,dict):raise ValueError('Geçersiz film isteği')
         ident=data.get('id');action=data.get('action')
+        if action=='language':
+            movie=catalog.get(ident);movie['turkish_original']=data.get('turkish_original') is True;catalog.store(movie);catalog.cache.clear()
+            await r.playback.reset()
+            return web.json_response({'ok':True})
         if action=='mark':catalog.mark(ident,data.get('status'));return web.json_response({'ok':True})
         if action in ('open','play','fallback'):
             return web.json_response(await r.playback.play(ident,data.get('source_id')))

@@ -80,7 +80,10 @@ class Movies:
                 if result.get('errors') or not result.get('data'):raise ValueError('Film kaynağı yanıtı değişti; daha sonra tekrar deneyin')
                 return result['data']
     def store(self,movie):
-        with self.db() as db:db.execute('INSERT OR REPLACE INTO movies VALUES(?,?)',(movie['id'],json.dumps(movie,ensure_ascii=False)))
+        with self.db() as db:
+            old=db.execute('SELECT data FROM movies WHERE id=?',(movie['id'],)).fetchone()
+            if old and 'turkish_original' not in movie:movie['turkish_original']=json.loads(old[0]).get('turkish_original',False)
+            db.execute('INSERT OR REPLACE INTO movies VALUES(?,?)',(movie['id'],json.dumps(movie,ensure_ascii=False)))
     def get(self,ident):
         if not isinstance(ident,str) or not re.fullmatch(r'tm\d{1,12}',ident):raise ValueError('Geçersiz film')
         with self.db() as db:row=db.execute('SELECT data FROM movies WHERE id=?',(ident,)).fetchone()
@@ -120,7 +123,7 @@ class Movies:
         if cached and cached[0]>time.time():return cached[1]
         node=(await self.query(DETAIL,{'id':ident})).get('node')
         if not node:raise ValueError('Film bulunamadı')
-        movie=movie_row(node);self.store(movie);offers=[];seen=set()
+        movie=movie_row(node);movie['turkish_original']=self.get(ident).get('turkish_original',False);self.store(movie);offers=[];seen=set()
         for offer in node.get('offers') or []:
             url=offer.get('standardWebURL','');languages=offer.get('subtitleLanguages') or []
             try:public_url(url)
@@ -189,7 +192,7 @@ class Movies:
     async def fallback(self,ident):
         movie=self.get(ident);key=('fallback',ident);cached=self.cache.get(key)
         if cached and cached[0]>time.time():return cached[1]
-        query=f'{movie["title"]} {movie["year"] or ""} Türkçe altyazılı izle'
+        query=f'{movie["title"]} {movie["year"] or ""} '+('film izle' if movie.get('turkish_original') else 'Türkçe altyazılı izle')
         async with ClientSession(connector=TCPConnector(resolver=PublicResolver()),timeout=ClientTimeout(total=5,connect=2),headers={'User-Agent':'Mozilla/5.0 SofaRemote movie discovery'}) as client:
             try:
                 html,_=await self.public_html(client,'https://html.duckduckgo.com/html/?q='+quote_plus(query))

@@ -1,4 +1,6 @@
+import asyncio
 import unittest
+from unittest.mock import patch
 from unittest.mock import AsyncMock
 from types import SimpleNamespace
 from server.playback import Playback,video_candidate,player_url
@@ -35,3 +37,21 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
         for url in ('https://imdb.com/title/a','https://www.filmara.com/film/a','https://www.justwatch.com/tr/film/a'):
             self.assertFalse(video_candidate(url))
         self.assertEqual(player_url('https://www.netflix.com/tr/title/123?source=test'),'https://www.netflix.com/watch/123')
+
+    async def test_hung_source_search_finishes_at_global_deadline(self):
+        async def hang(*args):await asyncio.sleep(10)
+        self.catalog.details.side_effect=hang
+        with patch('server.playback.SCAN_TIMEOUT',.03):
+            self.playback.sources('tm1');await asyncio.wait_for(self.playback.workers['tm1'],.3)
+        self.assertEqual(self.playback.sources('tm1')['state'],'ready')
+    async def test_turkish_original_does_not_require_subtitles(self):
+        movie={**MOVIE,'turkish_original':True};self.catalog.get=lambda ident:movie
+        self.catalog.details.return_value={'movie':movie,'offers':[{'url':'https://example.com/movie'}]}
+        self.playback.command=AsyncMock(return_value={'ok':True,'duration':7200,'turkish_subtitles':False})
+        self.playback.sources('tm1');await self.playback.workers['tm1']
+        self.assertEqual(len(self.playback.sources('tm1')['offers']),1)
+    async def test_foreign_movie_still_requires_subtitles_even_with_turkish_dub(self):
+        self.catalog.details.return_value={'offers':[{'url':'https://example.com/movie'}]}
+        self.playback.command=AsyncMock(return_value={'ok':True,'duration':7200,'turkish_subtitles':False,'turkish_audio':True})
+        self.playback.sources('tm1');await self.playback.workers['tm1']
+        self.assertEqual(self.playback.sources('tm1')['offers'],[])
