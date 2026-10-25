@@ -28,7 +28,7 @@ public class RemoteInteractionTest {
     private String js(String script)throws Exception{ArrayBlockingQueue<String> queue=new ArrayBlockingQueue<>(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->web.evaluateJavascript(script,queue::offer));String value=queue.poll(5,TimeUnit.SECONDS);assertNotNull(value);return value;}
     @Before public void connect()throws Exception{
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{rule.getActivity().openServer("http://10.0.2.2:8765");web=findWeb(rule.getActivity().findViewById(android.R.id.content));});
-        waitFor(()->"true".equals(js("typeof ws!=='undefined'&&ws.readyState===1")));
+        try{waitFor(()->"true".equals(js("typeof ws!=='undefined'&&ws.readyState===1")));}catch(AssertionError error){throw new AssertionError(js("JSON.stringify({url:location.href,text:document.body?.innerText,ws:typeof ws==='undefined'?'none':ws?.readyState})"),error);}
         js("window.testSent=[];window.testOriginalSend=WebSocket.prototype.send;WebSocket.prototype.send=function(value){testSent.push(JSON.parse(value));return testOriginalSend.call(this,value)};true");
     }
     private void hold(String selector)throws Exception{

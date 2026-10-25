@@ -14,7 +14,7 @@ $form.Text='Sofa Remote focus test';$form.Width=400;$form.Height=200;$form.TopMo
 $box=New-Object Windows.Forms.TextBox;$box.Width=300;$form.Controls.Add($box)
 $form.Add_Shown({$form.Activate();$box.Focus() | Out-Null})
 $timer=New-Object Windows.Forms.Timer;$timer.Interval=250
-$timer.Add_Tick({if(Test-Path -LiteralPath $c.Mode){$box.ReadOnly=$true}});$timer.Start()
+$timer.Add_Tick({$form.Activate();$box.Focus() | Out-Null;if(Test-Path -LiteralPath $c.Mode){$box.ReadOnly=$true}});$timer.Start()
 [Windows.Forms.Application]::Run($form)
 '''
 

@@ -79,7 +79,7 @@ class Remote:
     def __init__(self, adapter, state_dir):
         self.adapter=adapter; self.state=Path(state_dir); self.state.mkdir(parents=True,exist_ok=True)
         self.tokens={}; self.sockets=set(); self.lock=asyncio.Lock()
-        self.button_owners={}
+        self.button_owners={};self.keyboard_focus=None;self.browser_focus=False
         self.browser=None; self.browser_tabs=[]; self.browser_pending={}
         self.updater=Updater(self.state)
         self.icons=Icons()
@@ -221,6 +221,7 @@ async def browser_handler(request):
                     r.browser_tabs=tabs
                     await r.publish_tabs()
                 elif data.get('type')=='keyboard-focus' and type(data.get('active')) is bool:
+                    r.browser_focus=data['active']
                     await asyncio.gather(*(client.send_json({'type':'keyboard-focus','active':data['active']}) for client in list(r.sockets) if not client.closed),return_exceptions=True)
                 elif data.get('requestId') in r.browser_pending:
                     future=r.browser_pending[data['requestId']]
@@ -228,7 +229,7 @@ async def browser_handler(request):
             except (ValueError,TypeError,AttributeError): continue
     finally:
         if r.browser is ws:
-            r.browser=None;r.browser_tabs=[]
+            r.browser=None;r.browser_tabs=[];r.browser_focus=False
             await r.publish_tabs()
             for future in r.browser_pending.values():
                 if not future.done(): future.set_result({'error':'Tarayıcı bağlantısı kesildi'})
@@ -264,6 +265,7 @@ async def ws_handler(request):
     try:
         await ws.prepare(request); r.sockets.add(ws)
         await ws.send_json({'type':'hello','version':VERSION,'dryRun':isinstance(r.adapter,DryRun)})
+        if r.keyboard_focus or r.browser_focus:await ws.send_json({'type':'keyboard-focus','active':True})
         history=deque()
         async for msg in ws:
             if msg.type!=WSMsgType.TEXT: continue
@@ -342,12 +344,15 @@ def main():
         except OSError: print('Ağ keşfi başlatılamadı; telefon adresle bağlanabilir.')
         task=asyncio.create_task(app['remote'].updater.background()) if not args.dry_run else None
         monitor=FocusMonitor(app['remote'].state)
-        if not args.dry_run:monitor.start()
+        if not args.dry_run:
+            try:monitor.start()
+            except OSError:print('Gelişmiş klavye odağı başlatılamadı; standart yazı imleci kullanılacak.')
         async def watch_focus():
             previous=None
             while True:
                 try:
                     current=monitor.focused() or app['remote'].adapter.keyboard_focus()
+                    app['remote'].keyboard_focus=current
                     if current!=previous:
                         previous=current
                         await asyncio.gather(*(client.send_json({'type':'keyboard-focus','active':bool(current)}) for client in list(app['remote'].sockets) if not client.closed),return_exceptions=True)

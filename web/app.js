@@ -13,7 +13,8 @@ function toast(message){
  toastTimer=setTimeout(()=>{box.classList.remove('show');try{box.hidePopover?.()}catch{}},4500);
 }
 function status(message,online=false){$('#connection').textContent='● '+message;$('#connection').classList.toggle('online',online)}
-async function api(path,options={}){const r=await fetch('/api/'+path,{...options,signal:AbortSignal.timeout(6000)});if(!r.ok)throw new Error(await r.text());return r.json()}
+async function api(path,options={}){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6000);try{const r=await fetch('/api/'+path,{...options,signal:controller.signal});if(!r.ok)throw new Error(await r.text());return await r.json()}finally{clearTimeout(timer)}}
+
 function send(action,wait=false){
   if(ws?.readyState!==1){if(action.type!=='move'&&action.type!=='release')toast('Bilgisayar bağlı değil');return wait?Promise.reject(new Error('Bağlantı yok')):undefined}
   if(['keys','focus','window','launch','url','macro','tab'].includes(action.type)||(action.type==='button'&&action.down))resetTextInputs();
@@ -126,7 +127,7 @@ function setupFullMouse(){
  },{capture:true,passive:false});
  document.addEventListener('pointercancel',e=>{if(owners.has(e.pointerId)){owners.clear();globalMouse.reset()}},true);
  for(const name of ['contextmenu','selectstart','dragstart'])document.addEventListener(name,e=>{if(allowed(e)){e.preventDefault();e.stopImmediatePropagation()}},true);
- document.addEventListener('click',e=>{if(!replaying&&fullMouse&&!$('#sheet').open&&performance.now()<suppressUntil&&!e.target.closest('#top-tabs')){e.preventDefault();e.stopImmediatePropagation()}},true);
+ document.addEventListener('click',e=>{if(!replaying&&allowed(e)&&performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation()}},true);
  document.body.classList.toggle('full-mouse',fullMouse);
 }
 

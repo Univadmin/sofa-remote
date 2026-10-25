@@ -11,9 +11,10 @@ Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 $parent=Get-Process -Id $c.ProcessId
 while (!$parent.HasExited) {
-  $active=$false; $identity=''
+  $active=$false; $identity='';$kind='';$errorType=''
   try {
     $element=[System.Windows.Automation.AutomationElement]::FocusedElement
+    if ($element) { $kind=$element.Current.ControlType.ProgrammaticName }
     if ($element -and $element.Current.IsEnabled -and $element.Current.IsKeyboardFocusable) {
       $type=$element.Current.ControlType
       if ($type -eq [System.Windows.Automation.ControlType]::Edit -or $type -eq [System.Windows.Automation.ControlType]::ComboBox -or $type -eq [System.Windows.Automation.ControlType]::Document) {
@@ -29,9 +30,9 @@ while (!$parent.HasExited) {
         if ($active) { $identity=($element.Current.ProcessId.ToString()+':'+($element.GetRuntimeId() -join '.')) }
       }
     }
-  } catch {}
+  } catch { $errorType=$_.Exception.Message }
   # No names, field values or password contents are queried.
-  $json=@{active=$active;identity=$identity} | ConvertTo-Json -Compress
+  $json=@{active=$active;identity=$identity;controlType=$kind;error=$errorType} | ConvertTo-Json -Compress
   try {
     [IO.File]::WriteAllText($c.State+'.tmp',$json,(New-Object Text.UTF8Encoding($false)))
     Move-Item -LiteralPath ($c.State+'.tmp') -Destination $c.State -Force
