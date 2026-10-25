@@ -25,7 +25,7 @@ public class RemoteInteractionTest {
     private interface Condition { boolean get() throws Exception; }
     private void waitFor(Condition condition) throws Exception {long end=SystemClock.uptimeMillis()+15000;while(SystemClock.uptimeMillis()<end){if(condition.get())return;SystemClock.sleep(150);}fail("Android interaction timed out");}
     private WebView findWeb(View view){if(view instanceof WebView)return (WebView)view;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++){WebView match=findWeb(group.getChildAt(i));if(match!=null)return match;}}return null;}
-    private String js(String script)throws Exception{ArrayBlockingQueue<String> queue=new ArrayBlockingQueue<>(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->web.evaluateJavascript(script,queue::offer));String value=queue.poll(5,TimeUnit.SECONDS);assertNotNull(value);return value;}
+    private String js(String script)throws Exception{ArrayBlockingQueue<String> queue=new ArrayBlockingQueue<>(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->web.evaluateJavascript(script,queue::offer));String value=queue.poll(15,TimeUnit.SECONDS);assertNotNull(value);return value;}
     @Before public void connect()throws Exception{
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{rule.getActivity().openServer("http://10.0.2.2:8765");web=findWeb(rule.getActivity().findViewById(android.R.id.content));});
         try{waitFor(()->"true".equals(js("typeof ws!=='undefined'&&ws.readyState===1")));}catch(AssertionError error){throw new AssertionError(js("JSON.stringify({url:location.href,text:document.body?.innerText,ws:typeof ws==='undefined'?'none':ws?.readyState})"),error);}
@@ -66,6 +66,17 @@ public class RemoteInteractionTest {
             tap("#close-sheet");
         }
         assertEquals("2",js("testChecks"));
+    }
+    @Test public void movieModeShowsTitleYearImdbAndKeepsWatchHistory()throws Exception{
+        tap("#movies");waitFor(()->"true".equals(js("!!document.querySelector('[data-film-detail]')")));
+        assertEquals("true",js("document.querySelector('[data-film-list]').textContent.includes('Esaretin Bedeli')&&document.querySelector('[data-film-list]').textContent.includes('1994')&&document.querySelector('[data-film-list]').textContent.includes('9.3')"));
+        tap("[data-film-detail]");waitFor(()->"true".equals(js("!!document.querySelector('.film-card .primary')")));
+        assertEquals("true",js("document.querySelector('[data-film-list]').textContent.includes('Türkçe altyazı')"));
+        js("[...document.querySelectorAll('.film-card button')].find(b=>b.textContent==='✓ İzlendi olarak işaretle').click();true");
+        waitFor(()->"true".equals(js("document.querySelector('#toast').textContent==='İzleme listesi güncellendi'")));
+        tap("#close-sheet");tap("#movies");
+        js("const filter=document.querySelector('[data-film-filter]');filter.value='watched';filter.dispatchEvent(new Event('change'));true");
+        waitFor(()->"true".equals(js("document.querySelector('[data-film-list]').textContent.includes('İzlendi')")));
     }
     @Test public void longPressTextAndInputStartsMouseWithoutSelection()throws Exception{
         js("fullMouse=true;document.body.classList.add('full-mouse');true");

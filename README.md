@@ -87,3 +87,15 @@ Medya komutları aktif pencereye gider; oynatıcıya önce tıkla. Üçüncü pa
 Python 3.11+ kurulu Windows’ta `scripts/start-windows.cmd` dosyasını çalıştır. İsteğe bağlı otomatik açılış için `scripts/enable-startup.ps1` kullanılabilir. Kısayollar `%LOCALAPPDATA%/SofaRemote/shortcuts.json` içinde tutulur.
 
 MIT lisansı.
+
+### Film modu
+
+Alt bardaki Film düğmesi veya kumanda listesindeki Film modu ile film ara. Anahtar ya da hesap kurulumu gerekmez. Türkçe/orijinal film adı, yıl ve IMDb puanı JustWatch’ın herkese açık Türkiye kataloğundan alınır; tüm internetteki her filmi kapsadığı garanti edilmez. Sonuçlar sayfalıdır ve ziyaret edilen kayıtlar PC’de önbelleğe alınır. Yayın ve dil verileri önbellekten en fazla 15 dakika kullanılır.
+
+Film seçilince Türkiye yayınları ve Türkçe altyazı bilgisi kontrol edilir. Uygun kaynaklar ücretsiz/reklamlı, abonelik, kiralama ve satın alma sırasıyla listelenir. Kaynağı açmak ödeme yapmaz veya hesaba giriş yapmaz. Kaynak verisi erişilemezse hata gösterilir; erişim engelleri aşılmaya çalışılmaz.
+
+Öncelikli yayınlarda seçenek yoksa anahtarsız web araması yapılabilir. Diğer siteler en fazla beş HTTPS sonuçla sınırlandırılır; otomatik açılış için film adıyla eşleşme, oynatıcı ve Türkçe altyazı track etiketi gerekir. Bu teknik kontrol sitenin güvenli olduğunu veya akışın gerçekten çalışacağını garanti etmez. Dil bilgisi belirsiz sonuçlar otomatik açılmaz; kullanıcı ayrıca seçebilir. Sayfalarda program çalıştırılmaz ve medya dosyaları indirilmez. Arama hizmeti engellenirse PC’de web araması açılabilir.
+
+Film açılması yalnızca İzleniyor kaydı oluşturur. Güncel tarayıcı eklentisi film başlığı, süre ve gerçek oynatım ilerlemesini eşleştirip en az %90 izleme algılarsa İzlendi kaydı oluşturur; sayfada geçen süre veya ileri sarma yeterli değildir. Korumalı/özel oynatıcılarda algılama çalışmayabilir; elle işaretleme ve geri alma vardır. Geçmiş PC’de movies.sqlite3 dosyasında tutulur, telefonlar arasında ortaktır. İzleme durumu yayın platformlarının hesaplarına yazılmaz.
+
+Veri kaynağı: [JustWatch Türkiye](https://www.justwatch.com/tr). IMDb puanı kaynaktaki IMDb alanıdır; başka bir puan IMDb diye gösterilmez. Katalog herkese açık web arayüzünü kullanır; sağlayıcı değişiklikleri erişimi etkileyebilir.

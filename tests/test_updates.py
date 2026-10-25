@@ -34,13 +34,13 @@ class UpdateIntegrityTests(unittest.IsolatedAsyncioTestCase):
     async def check(self,body,expected):
         tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup)
         updater=Updater(tmp.name)
-        release={'tag_name':'v0.4.0','assets':[{'name':'SofaRemote.exe','browser_download_url':'https://github.com/Univadmin/sofa-remote/releases/download/v0.4.0/SofaRemote.exe','size':len(expected),'digest':'sha256:'+hashlib.sha256(expected).hexdigest()}]}
+        release={'tag_name':'v99.0.0','assets':[{'name':'SofaRemote.exe','browser_download_url':'https://github.com/Univadmin/sofa-remote/releases/download/v99.0.0/SofaRemote.exe','size':len(expected),'digest':'sha256:'+hashlib.sha256(expected).hexdigest()}]}
         with patch('server.updater.ClientSession',return_value=Session(release,body)),patch('server.updater.os',SimpleNamespace(name='nt')),patch('server.updater.sys',SimpleNamespace(frozen=True)):
             await updater.check()
         return updater
     async def test_verified_download_staged(self):
         updater=await self.check(b'complete-package',b'complete-package')
-        self.assertTrue(updater.status['ready']);self.assertEqual((updater.state/'SofaRemote-0.4.0.exe').read_bytes(),b'complete-package')
+        self.assertTrue(updater.status['ready']);self.assertEqual((updater.state/'SofaRemote-99.0.0.exe').read_bytes(),b'complete-package')
     async def test_corrupt_download_never_ready(self):
         updater=await self.check(b'changed-package!',b'complete-package')
         self.assertFalse(updater.status['ready']);self.assertEqual(updater.status['state'],'error')
@@ -50,8 +50,8 @@ class InstallHandshakeTests(unittest.IsolatedAsyncioTestCase):
     async def test_failed_helper_keeps_application_running(self):
         import sys
         tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup)
-        updater=Updater(tmp.name);updater.status.update(ready=True,latest='0.4.0')
-        (updater.state/'SofaRemote-0.4.0.exe').write_bytes(b'fixture')
+        updater=Updater(tmp.name);updater.status.update(ready=True,latest='99.0.0')
+        (updater.state/'SofaRemote-99.0.0.exe').write_bytes(b'fixture')
         process=SimpleNamespace(poll=lambda:1,terminate=lambda:None)
         with patch('server.updater.os',SimpleNamespace(name='nt',getpid=lambda:123)),patch('server.updater.sys',SimpleNamespace(frozen=True,executable=sys.executable,argv=['SofaRemote.exe'])),patch('server.windows_runtime.powershell',return_value=process):
             with self.assertRaisesRegex(ValueError,'yardımcısı'):

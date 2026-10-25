@@ -1,7 +1,7 @@
 'use strict';
 if(!Element.prototype.replaceChildren)Element.prototype.replaceChildren=function(...children){this.textContent='';this.append(...children)};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const labels={mouse:'⌖ Mouse',media:'▶ Medya',keyboard:'⌨ Klavye',browser:'▣ Tarayıcı / Sekmeler',apps:'▦ Uygulamalar',commands:'☷ Tüm butonlar',tools:'⚙ Araçlar',downloads:'↻ Güncelleme'};
+const labels={mouse:'⌖ Mouse',media:'▶ Medya',keyboard:'⌨ Klavye',browser:'▣ Tarayıcı / Sekmeler',apps:'▦ Uygulamalar',commands:'☷ Tüm butonlar',tools:'⚙ Araçlar',downloads:'↻ Güncelleme',movies:'🎬 Film modu'};
 const storage={get:(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}},set:(key,value)=>localStorage.setItem(key,JSON.stringify(value))};
 let paneTypes=storage.get('panes',['mouse','media']), shortcuts=[],ws,stopped=false,retry,sequence=0,pending=new Map(),toastTimer,tabsState={tabs:[],connected:false},tabsFingerprint='',fullMouse=storage.get('fullMouse',false),globalMouse=null,checkingUpdates=false,pcPrompted='',restartUntil=0;
 const escaped=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -14,7 +14,7 @@ function toast(message){
  toastTimer=setTimeout(()=>{box.classList.remove('show');try{box.hidePopover?.()}catch{}},4500);
 }
 function status(message,online=false){$('#connection').textContent='● '+message;$('#connection').classList.toggle('online',online)}
-async function api(path,options={}){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6000);try{const r=await fetch('/api/'+path,{...options,signal:controller.signal});if(!r.ok)throw new Error(await r.text());return await r.json()}finally{clearTimeout(timer)}}
+async function api(path,options={},timeout=6000){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeout);try{const r=await fetch('/api/'+path,{...options,signal:controller.signal});if(!r.ok)throw new Error(await r.text());return await r.json()}finally{clearTimeout(timer)}}
 
 function send(action,wait=false){
   if(ws?.readyState!==1){if(action.type!=='move'&&action.type!=='release')toast('Bilgisayar bağlı değil');return wait?Promise.reject(new Error('Bağlantı yok')):undefined}
@@ -28,7 +28,7 @@ function connect(){
   clearTimeout(retry);if(stopped)return;if(ws?.readyState===0||ws?.readyState===1)return;
   ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/api/ws`);
   ws.onopen=()=>{status('Bağlı',true);resetLive();window.SofaNative?.connectionReady();refreshGlobalTabs()};
-  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='server-restarting'){restartUntil=Date.now()+300000;status('Bilgisayar güncelleniyor…');return}if(d.type==='keyboard-focus'){if(d.active)openPhoneKeyboard();return}if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.version&&d.version!=='0.3.5'){location.reload();return}if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
+  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='server-restarting'){restartUntil=Date.now()+300000;status('Bilgisayar güncelleniyor…');return}if(d.type==='keyboard-focus'){if(d.active)openPhoneKeyboard();return}if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.version&&d.version!=='0.4.0'){location.reload();return}if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
   ws.onclose=()=>{for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('Bağlantı kesildi'))}pending.clear();resetLive();status(stopped?'Bağlantı kesildi':'Tekrar bağlanıyor');if(!stopped)retry=setTimeout(load,2000)};
   ws.onerror=()=>status('Bilgisayar aranıyor');
 }
@@ -50,7 +50,7 @@ function toolsMarkup(){return `<div class="grid"><button data-screen>Ekran öniz
 function catalogMarkup(){return '<div class="catalog"><input data-filter placeholder="Buton ara…" aria-label="Buton ara"><div data-command-list></div></div>'}
 function renderPane(index){
  const root=$('#pane-'+index);let type=paneTypes[index];if(!labels[type])type='mouse';
- root.innerHTML=`<div class="pane-heading"><small>${index===0?'1':'2'}</small><select data-controller aria-label="${index+1}. kumanda seçimi">${Object.entries(labels).map(([key,label])=>`<option value="${key}" ${type===key?'selected':''}>${label}</option>`).join('')}</select></div><div class="pane-content ${type==='mouse'?'mouse-content':''}">${({mouse:mouseMarkup,media:mediaMarkup,keyboard:keyboardMarkup,browser:browserMarkup,apps:appsMarkup,commands:catalogMarkup,tools:toolsMarkup,downloads:downloadsMarkup}[type])()}</div>`;
+ root.innerHTML=`<div class="pane-heading"><small>${index===0?'1':'2'}</small><select data-controller aria-label="${index+1}. kumanda seçimi">${Object.entries(labels).map(([key,label])=>`<option value="${key}" ${type===key?'selected':''}>${label}</option>`).join('')}</select></div><div class="pane-content ${type==='mouse'?'mouse-content':''}">${({mouse:mouseMarkup,media:mediaMarkup,keyboard:keyboardMarkup,browser:browserMarkup,apps:appsMarkup,commands:catalogMarkup,tools:toolsMarkup,downloads:downloadsMarkup,movies:movieMarkup}[type])()}</div>`;
  root.querySelector('[data-controller]').onchange=e=>{release();paneTypes[index]=e.target.value;storage.set('panes',paneTypes);renderPane(index)};
  setup(root,type);
 }
@@ -79,6 +79,7 @@ function setup(root,type){
  if(type==='browser'){renderTabsList(root);refreshGlobalTabs()}
  if(type==='commands')setupCatalog(root);
  if(type==='downloads')refreshDownloads(root);
+ if(type==='movies')setupMovies(root);
 }
 async function run(action){if(action.type==='click'){send({type:'button',button:action.button,down:true});send({type:'button',button:action.button,down:false});return}if(action.type==='power'&&!confirm('Bilgisayarın güç işlemi uygulansın mı?'))return;await send(action,true)}
 function setupLive(root){const t=root.querySelector('.keyboard-live');t.dataset.previous='';
@@ -226,3 +227,5 @@ function openPhoneKeyboard(){
 
 window.addEventListener('sofa-native-edit',e=>{send({type:'edit',delete:e.detail.delete,text:e.detail.text})});
 window.addEventListener('sofa-native-key',e=>send({type:'keys',keys:[e.detail]}));
+
+$('#movies').onclick=()=>{sheet('Film modu',movieMarkup());setupMovies($('#sheet-body'));};

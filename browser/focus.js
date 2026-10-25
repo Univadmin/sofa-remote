@@ -10,3 +10,15 @@ function report(){
 document.addEventListener('focusin',report,true);document.addEventListener('focusout',()=>setTimeout(report,0),true);
 window.addEventListener('focus',()=>{previous='';report()});report();
 chrome.runtime.onMessage.addListener(message=>{if(message.type==='focus-probe'){previous='';report();}});
+
+// Only playback metadata is reported; a server-side selected-film session is required.
+let filmTracking=false;
+chrome.runtime.onMessage.addListener(message=>{if(message.type==='movie-track')filmTracking=true});
+setInterval(()=>{
+ if(!filmTracking)return;
+ const videos=[...document.querySelectorAll('video')].filter(v=>Number.isFinite(v.duration)&&v.duration>=1200);
+ const video=videos.find(v=>!v.paused)||videos[0];if(!video)return;
+ const tracks=[...video.textTracks],tr=tracks.find(t=>/^tr(?:-|$)|^tur$/i.test(t.language));
+ if(tr&&tracks.every(t=>t.mode!=='showing'))tr.mode='showing';
+ chrome.runtime.sendMessage({type:'movie-progress',title:navigator.mediaSession?.metadata?.title||document.title,duration:video.duration,position:video.currentTime,playing:!video.paused&&!video.ended&&!video.seeking,turkish_subtitles:!!tr}).catch(()=>{});
+},10000);

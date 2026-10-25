@@ -11,3 +11,4 @@ input,textarea,[contenteditable=true]{-webkit-user-select:text;user-select:text}
 #top-tabs,#top-tabs *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 
 body{height:100vh;height:var(--screen-height,100vh)}
+.film-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-bottom:8px}.film-toolbar input{width:100%;margin:0!important}.film-card{padding:10px;border:1px solid var(--line);border-radius:12px;margin:8px 0;overflow-wrap:anywhere}.film-title{display:block;width:100%;text-align:left;background:transparent;border:0;padding:0;font-weight:650;font-size:14px}.film-card p{margin:5px 0;font-size:12px}.film-card small{color:var(--muted)}.film-card .wide{display:block;text-align:left}

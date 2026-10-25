@@ -12,7 +12,7 @@ import socket
 import sys
 import time
 from urllib.parse import urlsplit
-from aiohttp import web, WSMsgType
+from aiohttp import web, WSMsgType, ClientError
 from .input import Windows, DryRun, KEYS
 from .network import local_address
 from .version import VERSION, REPOSITORY
@@ -20,6 +20,7 @@ from .updater import Updater
 from .discovery import start_discovery
 from .icons import Icons
 from .focus import FocusMonitor
+from .movies import Movies
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent.parent))
 STATE = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'SofaRemote'
@@ -83,6 +84,7 @@ class Remote:
         self.browser=None; self.browser_tabs=[]; self.browser_pending={}
         self.updater=Updater(self.state)
         self.icons=Icons()
+        self.movies=Movies(self.state)
     def token(self):
         token=secrets.token_urlsafe(32); self.tokens[token]=time.monotonic()+24*3600; return token
     def authorized(self, token): return self.tokens.get(token,0)>time.monotonic()
@@ -140,6 +142,7 @@ class Remote:
                 await self.browser.send_json({**d,'requestId':ident})
                 result=await asyncio.wait_for(future,5)
                 if result.get('error'): raise ValueError(result['error'])
+                return {k:result[k] for k in ('tabId',) if type(result.get(k)) is int}
             finally: self.browser_pending.pop(ident,None)
         elif kind=='url': a.open_url(d['url'])
         elif kind=='profile': a.keys(PROFILES[d['profile']][d['action']])
@@ -219,10 +222,14 @@ async def browser_handler(request):
                         if type(tab.get('id')) is int and type(tab.get('windowId')) is int:
                             tabs.append({'id':tab['id'],'windowId':tab['windowId'],'title':str(tab.get('title',''))[:200], 'url':str(tab.get('url',''))[:2048],'active':bool(tab.get('active')), 'favicon':safe_favicon(tab.get('favicon',tab.get('favIconUrl','')))})
                     r.browser_tabs=tabs
+                    current_ids={t['id'] for t in tabs}
+                    r.movies.sessions={key:value for key,value in r.movies.sessions.items() if key in current_ids}
                     await r.publish_tabs()
                 elif data.get('type')=='keyboard-focus' and type(data.get('active')) is bool:
                     r.browser_focus=data['active']
                     await asyncio.gather(*(client.send_json({'type':'keyboard-focus','active':data['active']}) for client in list(r.sockets) if not client.closed),return_exceptions=True)
+                elif data.get('type')=='movie-progress':
+                    r.movies.progress(data)
                 elif data.get('requestId') in r.browser_pending:
                     future=r.browser_pending[data['requestId']]
                     if not future.done(): future.set_result(data)
@@ -259,6 +266,36 @@ async def shortcuts(request):
         try: r.save_shortcuts(await request.json())
         except (ValueError,TypeError,KeyError): raise web.HTTPBadRequest(text='Invalid shortcut configuration')
     return web.json_response(r.load_shortcuts())
+
+async def movies(request):
+    r=request.app['remote'];catalog=r.movies
+    try:
+        if request.method=='GET':
+            mode=request.query.get('mode','list')
+            if mode=='history':return web.json_response({'movies':catalog.history(),'has_more':False})
+            if mode=='details':return web.json_response(await catalog.details(request.query.get('id')))
+            if mode=='fallback':return web.json_response(await catalog.fallback(request.query.get('id')))
+            if mode!='list':raise ValueError('Geçersiz film işlemi')
+            return web.json_response(await catalog.search(request.query.get('q',''),request.query.get('cursor')))
+        data=await request.json();ident=data.get('id');action=data.get('action')
+        if action=='mark':catalog.mark(ident,data.get('status'));return web.json_response({'ok':True})
+        if action not in ('open','web','fallback'):raise ValueError('Geçersiz film işlemi')
+        if action=='fallback':
+            offers=(await catalog.fallback(ident))['offers'];index=data.get('offer')
+            if type(index) is not int or not 0<=index<len(offers):raise ValueError('Geçersiz kaynak')
+            url=offers[index]['url']
+        else:url=catalog.web_search(ident) if action=='web' else (await catalog.choose(ident,data.get('offer')))['url']
+        result={}
+        if r.browser is not None:result=await r.execute({'type':'tab','action':'new','url':url})
+        else:r.adapter.open_url(url)
+        if action!='web':
+            catalog.begin(ident,result.get('tabId'),url)
+            if type(result.get('tabId')) is int and r.browser is not None:await r.browser.send_json({'type':'movie-track','tabId':result['tabId']})
+        return web.json_response({'ok':True,'tracking':type(result.get('tabId')) is int and action!='web','url':url})
+    except ValueError as exc:raise web.HTTPBadRequest(text=str(exc)[:180])
+    except (TypeError,KeyError):raise web.HTTPBadRequest(text='Geçersiz film isteği')
+    except asyncio.TimeoutError:raise web.HTTPGatewayTimeout(text='Film kaynağı geç yanıt verdi. Tekrar deneyin.')
+    except (ClientError,OSError):raise web.HTTPBadGateway(text='Film kaynağına ulaşılamadı. Tekrar deneyin.')
 
 async def ws_handler(request):
     r=request.app['remote']; ws=web.WebSocketResponse(heartbeat=15,max_msg_size=65536)
@@ -308,6 +345,8 @@ def create_app(adapter=None,state_dir=None):
     app.router.add_post('/api/updates/check',check_updates)
     app.router.add_post('/api/updates/install',install_update)
     app.router.add_route('*','/api/shortcuts',shortcuts)
+    app.router.add_get('/api/movies',movies)
+    app.router.add_post('/api/movies',movies)
     app.router.add_get('/api/ws',ws_handler)
     async def index(_): return web.FileResponse(ROOT/'web/index.html')
     app.router.add_get('/',index)

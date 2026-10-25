@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sofa Remote Tabs",
-  "version": "0.3.5",
+  "version": "0.4.0",
   "description": "Yerel Sofa Remote kumandas\u0131ndan taray\u0131c\u0131 sekmelerini y\u00f6netin.",
   "permissions": [
     "tabs",
