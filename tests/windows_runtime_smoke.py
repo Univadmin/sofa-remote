@@ -43,6 +43,9 @@ def automatic_install_smoke():
                     assert str(state/'watchdog.ps1') in winreg.QueryValueEx(key,'SofaRemote')[0]
                 print('Automatic install: renamed download, canonical path, startup, previous process takeover and cleanup verified',flush=True)
         except Exception:
+            print('Remaining files:',[str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()],flush=True)
+            try:print('Server health:',healthy(8765),flush=True)
+            except Exception as exc:print('Server health error:',repr(exc),flush=True)
             for path in state.rglob('*.log'):
                 print(path.name,path.read_text(errors='replace')[-3000:],flush=True)
             raise

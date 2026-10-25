@@ -65,9 +65,10 @@ try {
  if ($c.Source -ne $c.Target -and (Test-Path -LiteralPath $c.Source)) {
   for ($n=0; $n -lt 30; $n++) {
    try {
-    if ((Get-FileHash -LiteralPath $c.Source -Algorithm SHA256).Hash -eq $c.Digest) { Remove-Item -LiteralPath $c.Source -Force }
+    if ((Get-FileHash -LiteralPath $c.Source -Algorithm SHA256).Hash -eq $c.Digest) { Remove-Item -LiteralPath $c.Source -Force;Log 'Downloaded launch file removed' }
+    else { Log 'Launch file changed; preserved' }
     break
-   } catch { Start-Sleep -Seconds 1 }
+   } catch { Log $_.Exception.Message;Start-Sleep -Seconds 1 }
   }
  }
  if ($legacy -and $legacy -ne $c.Target -and $legacy -ne $c.Source) {
@@ -100,6 +101,9 @@ def automatic_install(state):
     source=Path(sys.executable).resolve()
     if source==target.resolve():
         if not acquire_instance():return True
+        # A background process needs its own streams after the download launcher exits.
+        log=(state/'app.log').open('a',encoding='utf-8',buffering=1)
+        sys.stdout=log;sys.stderr=log
         configure_startup(True,state)
         return False
     target.parent.mkdir(parents=True,exist_ok=True)
