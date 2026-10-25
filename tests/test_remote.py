@@ -5,6 +5,7 @@ from aiohttp import CookieJar, WSServerHandshakeError
 from aiohttp.test_utils import TestClient, TestServer
 from server.app import create_app, validate_action, validate_url, Remote
 from server.input import DryRun
+from server.version import VERSION
 from server.network import local_address
 from server.updater import version_tuple, trusted_download
 
@@ -117,7 +118,7 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         response=await self.client.get('/api/icon',params={'url':'http://127.0.0.1/private'});self.assertEqual(response.status,404)
         await extension.close();await ws.close()
     async def test_downloads_status_no_network(self):
-        await self.connect();d=await (await self.client.get('/api/updates')).json();self.assertEqual(d['current'],'0.3.3');self.assertFalse(d['ready'])
+        await self.connect();d=await (await self.client.get('/api/updates')).json();self.assertEqual(d['current'],VERSION);self.assertFalse(d['ready'])
         self.assertEqual((await self.client.post('/api/updates/install')).status,400)
     async def test_browser_focus_broadcast_does_not_send_field_contents(self):
         await self.connect();phone=await self.client.ws_connect('/api/ws');await phone.receive_json()
