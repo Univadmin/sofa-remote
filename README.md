@@ -27,11 +27,13 @@ Ağ keşfi UDP 8766, kumanda bağlantısı TCP 8765 kullanır. Broadcast engelle
 
 v0.2 Android uygulaması yeni, genel bir paket kimliği ve kalıcı yayın imzası kullanır. v0.1 APK’sinin yerine bir kez yeni APK’yi kur; dilersen eski uygulamayı kaldır. Bundan sonraki APK güncellemeleri aynı paket ve imzayla gelir. Windows için yeni EXE’yi indirip eski programı kapattıktan sonra çalıştır.
 
+Birden fazla telefon aynı PC’ye eşzamanlı bağlanabilir. Her telefonun basılı tuttuğu mouse düğmeleri ayrı izlenir; birinin bağlantısı kesilince diğerinin sürüklemesi kesilmez.
+
 ## İki kumanda, tek ekran
 
 Ekran iki sabit alana ayrılır. Her alanın üstündeki listeden bağımsız kumanda seç: **Mouse + Medya**, **Klavye + Tarayıcı**, **Mouse + Uygulamalar** gibi. Düzen düğmesiyle üst üste veya yan yana görünümü seç. Tercihler hatırlanır; paneller kendi içlerinde kayar.
 
-- **Mouse:** touchpad, sol/sağ/orta tık, iki parmak kaydırma, hız ve solak ayarı. Çift dokunup ikinci dokunuşu basılı tutarak klasör veya pencere sürükle. **Düzen → Bütün ekranı mouse olarak kullan** ayarıyla ekranın her yerinde kaydır; bıraktığında sol tık gönderilir. Kısa düğme dokunuşları normal işlevini korur.
+- **Mouse:** touchpad, sol/sağ/orta tık, iki parmak kaydırma, hız ve solak ayarı. Çift dokunup ikinci dokunuşu basılı tutarak klasör veya pencere sürükle. **Düzen → Bütün ekranı mouse olarak kullan** açıkken çift dokun, ikinci dokunuşu bırakmadan kaydır; bıraktığında sol tık gönderilir. Tek dokunuş uygulamayı normal kullanır. Normal mouse yüzeyi bu ayardan bağımsız çalışır.
 - **Klavye:** telefon klavyesiyle anlık yazma, silme, Enter; Ctrl/Alt/Shift/Win, F1–F12 ve özel birleşimler. Yazı alanında yapılan değişiklikler PC’deki odaklanmış alana gönderilir. PC imlecini başka yolla taşırsan **Yeni alan** düğmesine dokun.
 - **Medya:** ses, sessiz, oynat/duraklat; genel site, YouTube ve Netflix profilleri. Android uygulaması ön plandayken telefonun ses düğmeleri PC sesini değiştirir.
 - **Tarayıcı / Sekmeler:** gezinme, sekme açma/kapatma/geçiş; eklenti bağlıysa sekmeleri adlarıyla listeleme, doğrudan seçme, yenileme ve kopyalama.

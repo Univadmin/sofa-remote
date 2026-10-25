@@ -78,7 +78,7 @@ class Remote:
     def __init__(self, adapter, state_dir):
         self.adapter=adapter; self.state=Path(state_dir); self.state.mkdir(parents=True,exist_ok=True)
         self.tokens={}; self.sockets=set(); self.lock=asyncio.Lock()
-        self.controller=None
+        self.button_owners={}
         self.browser=None; self.browser_tabs=[]; self.browser_pending={}
         self.updater=Updater(self.state)
         self.icons=Icons()
@@ -102,14 +102,28 @@ class Remote:
         path=self.state/'shortcuts.json'; temp=path.with_suffix('.tmp')
         temp.write_text(json.dumps(items,ensure_ascii=False),encoding='utf-8'); temp.replace(path)
     async def publish_tabs(self):
-        if self.controller is not None and not self.controller.closed:
-            try: await self.controller.send_json({'type':'tabs','tabs':self.browser_tabs,'connected':self.browser is not None})
-            except ConnectionError: pass
-    async def execute(self, action):
+        message={'type':'tabs','tabs':self.browser_tabs,'connected':self.browser is not None}
+        await asyncio.gather(*(ws.send_json(message) for ws in tuple(self.sockets) if not ws.closed),return_exceptions=True)
+    def button(self, client, button, down):
+        owner=self if client is None else client
+        owners=self.button_owners.setdefault(button,set())
+        if down:
+            if owner not in owners:
+                if not owners:self.adapter.button(button,True)
+                owners.add(owner)
+        elif owner in owners:
+            owners.remove(owner)
+            if not owners:self.adapter.button(button,False)
+        if not owners:self.button_owners.pop(button,None)
+    def release_client(self, client):
+        owner=self if client is None else client
+        for button in list(self.button_owners):
+            self.button(owner,button,False)
+    async def execute(self, action, client=None):
         d=validate_action(action); a=self.adapter; kind=d['type']
         if kind=='move': a.move(d['x'],d['y'])
         elif kind=='scroll': a.scroll(d['amount'])
-        elif kind=='button': a.button(d['button'],d['down'])
+        elif kind=='button': self.button(client,d['button'],d['down'])
         elif kind=='keys': a.keys(d['keys'])
         elif kind=='text': a.text(d['text'])
         elif kind=='edit':
@@ -133,7 +147,7 @@ class Remote:
         elif kind=='windows': return {'windows':a.windows()}
         elif kind=='focus': a.focus(d['id'])
         elif kind=='power': a.power(d['action'])
-        elif kind=='release': a.release()
+        elif kind=='release': self.release_client(client)
         elif kind=='delay': await asyncio.sleep(d['ms']/1000)
         elif kind=='screen':
             if isinstance(a,DryRun): raise ValueError('Screen preview requires Windows')
@@ -242,9 +256,6 @@ async def shortcuts(request):
 
 async def ws_handler(request):
     r=request.app['remote']; ws=web.WebSocketResponse(heartbeat=15,max_msg_size=65536)
-    # One active controller prevents interleaved dragging/macros from different phones.
-    if r.controller is not None: raise web.HTTPConflict(text='Başka telefon bağlı; önce bağlantısını kesin')
-    r.controller=ws
     try:
         await ws.prepare(request); r.sockets.add(ws)
         await ws.send_json({'type':'hello','dryRun':isinstance(r.adapter,DryRun)})
@@ -267,15 +278,15 @@ async def ws_handler(request):
                     if data.get('type')=='macro':
                         index=data.get('index'); items=r.load_shortcuts()
                         if type(index) is not int or not 0<=index<len(items): raise ValueError('Invalid shortcut')
-                        for action in items[index]['actions']: await r.execute(action)
+                        for action in items[index]['actions']: await r.execute(action,client=ws)
                         result={}
-                    else: result=await r.execute(data)
+                    else: result=await r.execute(data,client=ws)
                 if data.get('type')!='move': await ws.send_json({'type':'result','id':request_id,**result})
             except Exception as exc:
                 await ws.send_json({'type':'error','id':request_id,'message':str(exc)[:180]})
     finally:
-        r.adapter.release(); r.sockets.discard(ws)
-        if r.controller is ws: r.controller=None
+        r.sockets.discard(ws)
+        async with r.lock:r.release_client(ws)
     return ws
 
 def create_app(adapter=None,state_dir=None):

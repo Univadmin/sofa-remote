@@ -87,29 +87,45 @@ function setupLive(root){const t=root.querySelector('.keyboard-live');t.dataset.
 function gestureOptions(extra={}){return {
  move:(x,y)=>send({type:'move',x,y}),scroll:amount=>send({type:'scroll',amount}),
  button:(button,down)=>send({type:'button',button,down}),click:button=>{send({type:'button',button,down:true});send({type:'button',button,down:false})},
- speed:()=>storage.get('speed',1.6),lefty:()=>storage.get('lefty',false),schedule:requestAnimationFrame,cancelFrame:cancelAnimationFrame,...extra
+ speed:()=>storage.get('speed',1.6),lefty:()=>storage.get('lefty',false),schedule:callback=>window.requestAnimationFrame(callback),cancelFrame:id=>window.cancelAnimationFrame(id),...extra
 }}
 function setupMouse(root){
  const pad=root.querySelector('.touchpad'),engine=new MouseGesture(gestureOptions({manual:()=>root.querySelector('[data-drag]').checked}));
  pad.addEventListener('sofa-reset',()=>engine.reset());
- pad.onpointerdown=e=>{if(fullMouse)return;e.preventDefault();pad.setPointerCapture(e.pointerId);engine.down(e)};
- pad.onpointermove=e=>{if(!fullMouse)engine.move(e)};pad.onpointerup=e=>{if(!fullMouse)engine.up(e)};pad.onpointercancel=()=>{engine.reset();send({type:'release'})};
+ pad.onpointerdown=e=>{e.preventDefault();pad.setPointerCapture(e.pointerId);engine.down(e)};
+ pad.onpointermove=e=>engine.move(e);pad.onpointerup=e=>engine.up(e);pad.onpointercancel=()=>{engine.reset();send({type:'release'})};
  root.querySelector('[data-drag]').onchange=e=>send({type:'button',button:'left',down:e.target.checked});
  root.querySelector('[data-speed]').onchange=e=>storage.set('speed',Number(e.target.value));root.querySelector('[data-lefty]').onchange=e=>storage.set('lefty',e.target.checked);
 }
 function setupFullMouse(){
- globalMouse=new MouseGesture(gestureOptions({releaseClick:()=>true,lefty:()=>false,manual:()=>false}));let suppressUntil=0;const owners=new Set();
- const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.topbar,input,textarea,select,[contenteditable=true]');
- document.addEventListener('pointerdown',e=>{if(!allowed(e))return;owners.add(e.pointerId);if(e.target.closest('button,a,summary,label'))globalMouse.lastTap=null;globalMouse.down(e)},{capture:true});
- document.addEventListener('pointermove',e=>{if(!owners.has(e.pointerId))return;globalMouse.move(e);if(e.cancelable&&globalMouse.gesture?.moved)e.preventDefault()},{capture:true,passive:false});
- document.addEventListener('pointerup',e=>{if(!owners.delete(e.pointerId))return;
-   const interactive=e.target.closest('button,a,summary,label');if(interactive&&!globalMouse.gesture?.moved&&!globalMouse.held){globalMouse.reset();return}
-   const result=globalMouse.up(e);if(result?.moved){suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
+ globalMouse=new DoubleTapMouse(gestureOptions());let suppressUntil=0,pendingClick=null,replaying=false;const owners=new Map();
+ const clearPending=()=>{if(pendingClick)clearTimeout(pendingClick.timer);pendingClick=null};
+ const replayPending=()=>{const p=pendingClick;clearPending();if(p){replaying=true;p.target.click();replaying=false}};
+ const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.touchpad,.topbar,input,textarea,select,[contenteditable=true]');
+ document.addEventListener('pointerdown',e=>{
+  if(!allowed(e))return;const scroll=e.target.closest('.pane-content');owners.set(e.pointerId,scroll);
+  if(globalMouse.down(e)){clearPending();suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
  },{capture:true,passive:false});
- document.addEventListener('pointercancel',()=>{owners.clear();globalMouse.reset();send({type:'release'})},true);
- document.addEventListener('click',e=>{if(fullMouse&&performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation()}},true);
+ document.addEventListener('pointermove',e=>{
+  if(!owners.has(e.pointerId))return;const result=globalMouse.move(e);if(!result)return;
+  if(result.active){suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
+  else if(result.moved){const scroll=owners.get(e.pointerId);if(scroll)scroll.scrollTop-=result.dy;}
+ },{capture:true,passive:false});
+ document.addEventListener('pointerup',e=>{
+  if(!owners.delete(e.pointerId))return;const result=globalMouse.up(e);
+  if(result?.active||result?.moved){suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
+ },{capture:true,passive:false});
+ document.addEventListener('pointercancel',e=>{if(owners.has(e.pointerId)){owners.clear();globalMouse.reset()}},true);
+ document.addEventListener('click',e=>{
+  if(!fullMouse||replaying||$('#sheet').open)return;
+  if(performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation();return}
+  const target=e.target.closest('button,a,summary');if(!target||!allowed(e))return;
+  e.preventDefault();e.stopImmediatePropagation();if(pendingClick)replayPending();
+  pendingClick={target,timer:setTimeout(replayPending,350)};
+ },true);
  document.body.classList.toggle('full-mouse',fullMouse);
 }
+
 function iconFor(item){
  const page=item.actions?.find(a=>a.type==='url')?.url;if(!page)return null;
  let match=tabsState.tabs.find(t=>t.url===page);if(!match){try{match=tabsState.tabs.find(t=>{try{return new URL(t.url).hostname===new URL(page).hostname}catch{return false}})}catch{}}
@@ -143,7 +159,7 @@ function renderTabsList(root){
 async function refreshApps(root){const {windows}=await send({type:'windows'},true),list=root.querySelector('[data-windows]');list.replaceChildren();for(const w of windows){const row=document.createElement('div');row.className='list-item';const title=document.createElement('button');title.textContent=w.title;title.className='title';title.onclick=()=>run({type:'focus',id:w.id}).catch(e=>toast(e.message));row.append(title);const actions=document.createElement('div');actions.className='grid four';for(const [action,name] of [['minimize','Küçült'],['maximize','Büyüt'],['restore','Geri al'],['close','Kapat']]){const b=document.createElement('button');b.className='small';b.textContent=name;b.onclick=async()=>{if(action==='close'&&!confirm(w.title+' kapatılsın mı?'))return;try{await run({type:'window',handle:w.id,action});await refreshApps(root)}catch(e){toast(e.message)}};actions.append(b)}row.append(actions);list.append(row)}}
 function sheet(title,html){release();$('#sheet-title').textContent=title;$('#sheet-body').innerHTML=html;$('#sheet').showModal()}
 $('#close-sheet').onclick=()=>$('#sheet').close();$('#sheet').addEventListener('click',e=>{if(e.target===$('#sheet'))$('#sheet').close()});
-$('#layout').onclick=()=>{sheet('Ekran ve mouse','<label class="setting-switch"><input type="checkbox" id="full-mouse-setting" '+(fullMouse?'checked':'')+'> Bütün ekranı mouse olarak kullan</label><p class="hint">Ekranın herhangi bir yerinde kaydır: mouse hareket eder. Parmağını bırak: sol tık. Düğmelere kısa dokunuş normal çalışır.</p><p class="hint">Normal mouse: çift dokun, ikinci dokunuşu basılı tutup kaydırarak sürükle.</p><div class="grid"><button id="stack">▤ Üst üste</button><button id="side">▥ Yan yana</button></div>');$('#full-mouse-setting').onchange=e=>{release();fullMouse=e.target.checked;storage.set('fullMouse',fullMouse);document.body.classList.toggle('full-mouse',fullMouse);toast(fullMouse?'Tam ekran mouse açık':'Normal mouse açık')};$('#stack').onclick=()=>setLayout(false);$('#side').onclick=()=>setLayout(true)};
+$('#layout').onclick=()=>{sheet('Ekran ve mouse','<label class="setting-switch"><input type="checkbox" id="full-mouse-setting" '+(fullMouse?'checked':'')+'> Bütün ekranı mouse olarak kullan</label><p class="hint">Çift dokun; ikinci dokunuşu bırakmadan kaydır: mouse hareket eder. Parmağını kaldırınca sol tık yapılır. Tek dokunuş uygulamayı normal kullanır. Normal mouse yüzeyi her zaman çalışır.</p><p class="hint">Normal mouse: çift dokun, ikinci dokunuşu basılı tutup kaydırarak sürükle.</p><div class="grid"><button id="stack">▤ Üst üste</button><button id="side">▥ Yan yana</button></div>');$('#full-mouse-setting').onchange=e=>{release();fullMouse=e.target.checked;storage.set('fullMouse',fullMouse);document.body.classList.toggle('full-mouse',fullMouse);toast(fullMouse?'Tam ekran mouse açık':'Normal mouse açık')};$('#stack').onclick=()=>setLayout(false);$('#side').onclick=()=>setLayout(true)};
 function setLayout(side){$('#workspace').classList.toggle('side',side);storage.set('side',side);$('#sheet').close()}
 $('#shortcuts').onclick=()=>{sheet('Kısayollar ve makrolar','<input id="shortcut-name" placeholder="Kısayol adı" aria-label="Kısayol adı"><input id="shortcut-url" placeholder="https://…" type="url" aria-label="Site adresi"><input id="shortcut-icon" placeholder="Makro sembolü (ör. 🎬)" maxlength="12"><button id="add-shortcut" class="primary wide">Site ekle</button><div id="shortcut-list"></div><details><summary>Makroları düzenle / yedekle</summary><textarea id="macro-json" aria-label="Makrolar"></textarea><button id="save-macros" class="wide">Kaydet</button></details>');$('#macro-json').value=JSON.stringify(shortcuts,null,2);const list=$('#shortcut-list');shortcuts.forEach((item,index)=>{const row=document.createElement('div');row.className='row list-item';const name=document.createElement('span');name.className='title';name.textContent=item.name;const del=document.createElement('button');del.textContent='Sil';del.onclick=async()=>{try{await save(shortcuts.filter((_,i)=>i!==index));$('#sheet').close()}catch(e){toast(e.message)}};row.append(iconElement(item),name,del);list.append(row)});$('#add-shortcut').onclick=async()=>{try{await save([...shortcuts,{name:$('#shortcut-name').value.trim(),icon:$('#shortcut-icon').value||'🌐',actions:[{type:'url',url:$('#shortcut-url').value.trim()}]}]);$('#sheet').close()}catch(e){toast(e.message)}};$('#save-macros').onclick=async()=>{try{await save(JSON.parse($('#macro-json').value));$('#sheet').close()}catch(e){toast(e.message)}}};
 function downloadsMarkup(){return `<div class="update-info" aria-live="polite"><p data-update-status>PC sürümü okunuyor…</p><p data-android-status></p></div><button class="primary wide" data-check-updates>Güncellemeleri kontrol et</button>`}

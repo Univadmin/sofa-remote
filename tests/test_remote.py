@@ -63,11 +63,37 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         await self.connect();ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
         await ws.send_json({'type':'keys','keys':['BAD']});self.assertEqual((await ws.receive_json())['type'],'error')
         await ws.send_json({'type':'ping'});self.assertEqual((await ws.receive_json())['type'],'result');await ws.close()
-    async def test_single_controller_and_release(self):
-        released=[];self.adapter.release=lambda:released.append(True)
-        await self.connect();ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
-        with self.assertRaises(WSServerHandshakeError) as cm:await self.client.ws_connect('/api/ws')
-        self.assertEqual(cm.exception.status,409);await ws.close();await asyncio.sleep(0.01);self.assertTrue(released)
+    async def two_phones(self):
+        await self.connect();a=await self.client.ws_connect('/api/ws');await a.receive_json()
+        b=await self.client.ws_connect('/api/ws');await b.receive_json();return a,b
+    async def command(self,ws,action):
+        await ws.send_json(action);return await ws.receive_json()
+    async def test_two_phones_can_control_at_the_same_time(self):
+        a,b=await self.two_phones()
+        self.assertEqual((await self.command(a,{'type':'keys','keys':['VOLUMEUP']}))['type'],'result')
+        self.assertEqual((await self.command(b,{'type':'keys','keys':['MUTE']}))['type'],'result')
+        self.assertEqual(self.adapter.events,[('keys',['VOLUMEUP']),('keys',['MUTE'])]);await a.close();await b.close()
+    async def test_disconnect_does_not_release_another_phones_drag(self):
+        a,b=await self.two_phones();await self.command(a,{'type':'button','button':'left','down':True})
+        await b.close();await asyncio.sleep(0.01);self.assertEqual(self.adapter.events,[('button','left',True)])
+        await a.close();await asyncio.sleep(0.01);self.assertEqual(self.adapter.events,[('button','left',True),('button','left',False)])
+    async def test_release_only_applies_to_the_requesting_phone(self):
+        a,b=await self.two_phones()
+        await self.command(a,{'type':'button','button':'left','down':True});await self.command(b,{'type':'release'})
+        self.assertEqual(self.adapter.events,[('button','left',True)])
+        await self.command(a,{'type':'release'});self.assertEqual(self.adapter.events,[('button','left',True),('button','left',False)])
+        await a.close();await b.close()
+    async def test_shared_button_is_released_after_last_owner(self):
+        a,b=await self.two_phones()
+        for ws in (a,b):await self.command(ws,{'type':'button','button':'left','down':True})
+        await self.command(a,{'type':'button','button':'left','down':False});self.assertEqual(self.adapter.events,[('button','left',True)])
+        await self.command(b,{'type':'button','button':'left','down':False});self.assertEqual(self.adapter.events,[('button','left',True),('button','left',False)])
+        await a.close();await b.close()
+    async def test_both_phones_receive_tab_changes(self):
+        a,b=await self.two_phones();extension=await self.client.ws_connect('/api/browser',headers={'Origin':'chrome-extension://abcdefghijklmnop'})
+        await extension.send_json({'type':'tabs','tabs':[{'id':1,'windowId':1,'title':'Site','url':'https://example.com'}]})
+        for ws in (a,b):self.assertEqual((await ws.receive_json())['type'],'tabs')
+        await extension.close();await a.close();await b.close()
     async def test_macro_clipboard(self):
         await self.connect();items=[{'name':'Film','actions':[{'type':'url','url':'https://example.com'},{'type':'delay','ms':0},{'type':'keys','keys':['F11']}]}]
         self.assertEqual((await self.client.put('/api/shortcuts',json=items)).status,200)
@@ -91,7 +117,7 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         response=await self.client.get('/api/icon',params={'url':'http://127.0.0.1/private'});self.assertEqual(response.status,404)
         await extension.close();await ws.close()
     async def test_downloads_status_no_network(self):
-        await self.connect();d=await (await self.client.get('/api/updates')).json();self.assertEqual(d['current'],'0.3.0');self.assertFalse(d['ready'])
+        await self.connect();d=await (await self.client.get('/api/updates')).json();self.assertEqual(d['current'],'0.3.1');self.assertFalse(d['ready'])
         self.assertEqual((await self.client.post('/api/updates/install')).status,400)
     async def test_expired_session(self):
         await self.connect();self.app['remote'].tokens.clear();self.assertEqual((await self.client.get('/api/shortcuts')).status,401)
