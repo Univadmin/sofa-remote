@@ -199,7 +199,8 @@ class Movies:
                 try:
                     html,final=await self.public_html(client,url);page=FilmPage();page.feed(html)
                     title=normalized(' '.join(page.text));matched=any(len(n)>=4 and n in title for n in (normalized(movie['title']),normalized(movie['original_title'])))
-                    if not matched:return None
+                    from .playback import video_candidate
+                    if not matched or not page.player or not video_candidate(final):return None
                     return {'url':final,'provider':urlsplit(final).hostname,'cost':'Site koşulları bilinmiyor','kind':'UNKNOWN',
                         'turkish_subtitles':page.turkish and page.player,'unverified':True,'languages_known':page.turkish}
                 except Exception:return None

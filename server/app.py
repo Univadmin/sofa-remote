@@ -21,6 +21,7 @@ from .discovery import start_discovery
 from .icons import Icons
 from .focus import FocusMonitor
 from .movies import Movies
+from .playback import Playback
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent.parent))
 STATE = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'SofaRemote'
@@ -85,6 +86,7 @@ class Remote:
         self.updater=Updater(self.state)
         self.icons=Icons()
         self.movies=Movies(self.state)
+        self.movie_capable=False;self.playback=Playback(self)
     def token(self):
         token=secrets.token_urlsafe(32); self.tokens[token]=time.monotonic()+24*3600; return token
     def authorized(self, token): return self.tokens.get(token,0)>time.monotonic()
@@ -210,13 +212,20 @@ async def browser_handler(request):
     r=request.app['remote'];ws=web.WebSocketResponse(heartbeat=20,max_msg_size=2500000)
     await ws.prepare(request)
     if r.browser is not None: await r.browser.close()
+    await r.playback.reset();r.movie_capable=False
     r.browser=ws
     try:
         async for msg in ws:
             if msg.type!=WSMsgType.TEXT:continue
             try:
                 data=json.loads(msg.data)
-                if data.get('type')=='tabs' and isinstance(data.get('tabs'),list):
+                if data.get('type')=='movie-capabilities':
+                    r.movie_capable=data.get('version')==1
+                elif data.get('type')=='movie-gesture':
+                    ident=data.get('requestId')
+                    if ident in r.playback.gestures:
+                        r.playback.gestures.discard(ident);r.adapter.keys(['SPACE'])
+                elif data.get('type')=='tabs' and isinstance(data.get('tabs'),list):
                     tabs=[]
                     for tab in data['tabs'][:200]:
                         if type(tab.get('id')) is int and type(tab.get('windowId')) is int:
@@ -236,7 +245,8 @@ async def browser_handler(request):
             except (ValueError,TypeError,AttributeError): continue
     finally:
         if r.browser is ws:
-            r.browser=None;r.browser_tabs=[];r.browser_focus=False
+            r.browser=None;r.movie_capable=False;r.browser_tabs=[];r.browser_focus=False
+            await r.playback.reset()
             await r.publish_tabs()
             for future in r.browser_pending.values():
                 if not future.done(): future.set_result({'error':'Tarayıcı bağlantısı kesildi'})
@@ -273,25 +283,17 @@ async def movies(request):
         if request.method=='GET':
             mode=request.query.get('mode','list')
             if mode=='history':return web.json_response({'movies':catalog.history(),'has_more':False})
-            if mode=='details':return web.json_response(await catalog.details(request.query.get('id')))
+            if mode in ('details','sources'):return web.json_response(r.playback.sources(request.query.get('id'),request.query.get('refresh')=='1'))
             if mode=='fallback':return web.json_response(await catalog.fallback(request.query.get('id')))
             if mode!='list':raise ValueError('Geçersiz film işlemi')
             return web.json_response(await catalog.search(request.query.get('q',''),request.query.get('cursor')))
-        data=await request.json();ident=data.get('id');action=data.get('action')
+        data=await request.json()
+        if not isinstance(data,dict):raise ValueError('Geçersiz film isteği')
+        ident=data.get('id');action=data.get('action')
         if action=='mark':catalog.mark(ident,data.get('status'));return web.json_response({'ok':True})
-        if action not in ('open','web','fallback'):raise ValueError('Geçersiz film işlemi')
-        if action=='fallback':
-            offers=(await catalog.fallback(ident))['offers'];index=data.get('offer')
-            if type(index) is not int or not 0<=index<len(offers):raise ValueError('Geçersiz kaynak')
-            url=offers[index]['url']
-        else:url=catalog.web_search(ident) if action=='web' else (await catalog.choose(ident,data.get('offer')))['url']
-        result={}
-        if r.browser is not None:result=await r.execute({'type':'tab','action':'new','url':url})
-        else:r.adapter.open_url(url)
-        if action!='web':
-            catalog.begin(ident,result.get('tabId'),url)
-            if type(result.get('tabId')) is int and r.browser is not None:await r.browser.send_json({'type':'movie-track','tabId':result['tabId']})
-        return web.json_response({'ok':True,'tracking':type(result.get('tabId')) is int and action!='web','url':url})
+        if action in ('open','play','fallback'):
+            return web.json_response(await r.playback.play(ident,data.get('source_id')))
+        raise ValueError('Geçersiz film işlemi')
     except ValueError as exc:raise web.HTTPBadRequest(text=str(exc)[:180])
     except (TypeError,KeyError):raise web.HTTPBadRequest(text='Geçersiz film isteği')
     except asyncio.TimeoutError:raise web.HTTPGatewayTimeout(text='Film kaynağı geç yanıt verdi. Tekrar deneyin.')
@@ -337,6 +339,8 @@ def create_app(adapter=None,state_dir=None):
     app=web.Application(middlewares=[security],client_max_size=65536)
     app['remote']=Remote(adapter if adapter is not None else Windows(),state_dir or STATE)
     app['tasks']=set()
+    async def close_playback(app):await app['remote'].playback.reset()
+    app.on_cleanup.append(close_playback)
     app.router.add_get('/api/info',info)
     app.router.add_get('/api/icon',site_icon)
     app.router.add_post('/api/connect',connect_device)

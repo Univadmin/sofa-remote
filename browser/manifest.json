@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sofa Remote Tabs",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Yerel Sofa Remote kumandas\u0131ndan taray\u0131c\u0131 sekmelerini y\u00f6netin.",
   "permissions": [
     "tabs",
@@ -21,7 +21,8 @@
         "https://*/*"
       ],
       "js": [
-        "focus.js"
+        "focus.js",
+        "movie-player.js"
       ],
       "all_frames": true,
       "match_about_blank": true

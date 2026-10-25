@@ -18,7 +18,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check web/app.js && node --check web/movies.js && node --check browser/background.js && node --test tests/gestures.test.cjs tests/browser.test.cjs tests/fullmouse.test.cjs
+      - run: node --check web/app.js && node --check web/movies.js && node --check browser/background.js && node --check browser/movie-controller.js && node --check browser/movie-player.js && node --test tests/gestures.test.cjs tests/browser.test.cjs tests/fullmouse.test.cjs
+      - name: Real Chromium playback tests
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+          python tests/browser_playback_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Browser-playback-results
+          path: .state/playback-smoke/*.png
   android:
     runs-on: ubuntu-latest
     steps:
@@ -137,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cd browser && zip -r ../SofaRemote-Browser.zip manifest.json background.js focus.js
+      - run: cd browser && zip -r ../SofaRemote-Browser.zip manifest.json background.js focus.js movie-controller.js movie-player.js
       - uses: actions/upload-artifact@v4
         with:
           name: Sofa-Remote-Browser

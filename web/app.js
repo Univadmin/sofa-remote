@@ -28,7 +28,7 @@ function connect(){
   clearTimeout(retry);if(stopped)return;if(ws?.readyState===0||ws?.readyState===1)return;
   ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/api/ws`);
   ws.onopen=()=>{status('Bağlı',true);resetLive();window.SofaNative?.connectionReady();refreshGlobalTabs()};
-  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='server-restarting'){restartUntil=Date.now()+300000;status('Bilgisayar güncelleniyor…');return}if(d.type==='keyboard-focus'){if(d.active)openPhoneKeyboard();return}if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.version&&d.version!=='0.4.0'){location.reload();return}if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
+  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='server-restarting'){restartUntil=Date.now()+300000;status('Bilgisayar güncelleniyor…');return}if(d.type==='keyboard-focus'){if(d.active)openPhoneKeyboard();return}if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.version&&d.version!=='0.4.1'){location.reload();return}if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
   ws.onclose=()=>{for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('Bağlantı kesildi'))}pending.clear();resetLive();status(stopped?'Bağlantı kesildi':'Tekrar bağlanıyor');if(!stopped)retry=setTimeout(load,2000)};
   ws.onerror=()=>status('Bilgisayar aranıyor');
 }

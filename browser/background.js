@@ -13,8 +13,8 @@ async function command(d){
 function connect(){
   if(connecting||socket?.readyState===0||socket?.readyState===1)return;connecting=true;
   socket=new WebSocket('ws://127.0.0.1:8765/api/browser');
-  socket.onopen=()=>{connecting=false;publish();probeFocus()};
-  socket.onmessage=async event=>{const d=JSON.parse(event.data);if(d.type==='movie-track'){filmTabs.add(d.tabId);chrome.tabs.sendMessage(d.tabId,{type:'movie-track'}).catch(()=>{});return}if(d.type!=='tab')return;try{const result=await command(d);if(socket.readyState===1)socket.send(JSON.stringify({requestId:d.requestId,ok:true,...result}));publish().catch(()=>{})}catch(e){if(socket.readyState===1)socket.send(JSON.stringify({requestId:d.requestId,error:e.message}))}};
+  socket.onopen=()=>{connecting=false;socket.send(JSON.stringify({type:'movie-capabilities',version:1}));publish();probeFocus()};
+  socket.onmessage=async event=>{const d=JSON.parse(event.data);if(['movie-probe','movie-play','movie-cancel'].includes(d.type)){movieCommand(d);return}if(d.type==='movie-track'){filmTabs.add(d.tabId);chrome.tabs.sendMessage(d.tabId,{type:'movie-track'}).catch(()=>{});return}if(d.type!=='tab')return;try{const result=await command(d);if(socket.readyState===1)socket.send(JSON.stringify({requestId:d.requestId,ok:true,...result}));publish().catch(()=>{})}catch(e){if(socket.readyState===1)socket.send(JSON.stringify({requestId:d.requestId,error:e.message}))}};
   socket.onclose=()=>{connecting=false;setTimeout(connect,3000)};socket.onerror=()=>{connecting=false};
 }
 chrome.tabs.onActivated.addListener(publish);chrome.tabs.onUpdated.addListener(publish);chrome.tabs.onRemoved.addListener(publish);chrome.tabs.onCreated.addListener(publish);
@@ -42,3 +42,5 @@ chrome.runtime.onMessage.addListener((message,sender)=>{
 
 chrome.tabs.onUpdated.addListener((tabId,change)=>{if(change.status==='complete'&&filmTabs.has(tabId))chrome.tabs.sendMessage(tabId,{type:'movie-track'}).catch(()=>{})});
 chrome.tabs.onRemoved.addListener(tabId=>filmTabs.delete(tabId));
+
+if(typeof importScripts==='function')importScripts('movie-controller.js');

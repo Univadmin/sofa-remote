@@ -22,5 +22,8 @@ async def movie_fixture(query,variables):
     if variables.get('id'):return {'node':{**movie,'offers':[{'standardWebURL':'https://www.netflix.com/watch/1','monetizationType':'FLATRATE','subtitleLanguages':['tr'],'package':{'clearName':'Netflix','technicalName':'netflix'}}]}}
     return {'popularTitles':{'edges':[{'node':movie}],'pageInfo':{'endCursor':None,'hasNextPage':False}}}
 remote.movies.query=movie_fixture
+remote.movie_capable=True
+async def playback_fixture(kind,**data):return {'ok':True,'duration':8520,'turkish_subtitles':True,'tabId':202,'fullscreen':True}
+remote.playback.command=playback_fixture
 app.router.add_post('/__focus',focus)
 web.run_app(app,host='0.0.0.0',port=8765,access_log=None)

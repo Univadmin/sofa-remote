@@ -67,8 +67,23 @@ class MovieApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.client.get('/api/movies')).status,401)
         await self.client.post('/api/connect');r=await self.client.get('/api/movies');self.assertEqual(r.status,200)
         self.app['remote'].movies.query=AsyncMock(return_value={'node':{**NODE,'offers':[offer('https://www.netflix.com/watch/1',['tr'])]}})
-        r=await self.client.post('/api/movies',json={'action':'open','id':'tm119206'});self.assertEqual(r.status,200)
-        self.assertEqual(self.adapter.events,[('url','https://www.netflix.com/watch/1')])
+        r=await self.client.post('/api/movies',json={'action':'open','id':'tm119206'})
+        self.assertEqual(r.status,400)
+        self.assertEqual(self.adapter.events,[])
+        self.assertEqual(self.app['remote'].movies.history(),[])
+        remote=self.app['remote'];remote.browser=object();remote.movie_capable=True
+        remote.playback.command=AsyncMock(return_value={'ok':True,'duration':8520,'turkish_subtitles':True,'tabId':4,'fullscreen':True})
+        remote.playback.sources('tm119206');await remote.playback.workers['tm119206']
+        r=await self.client.post('/api/movies',json={'action':'play','id':'tm119206'});self.assertEqual(r.status,200)
         history=await (await self.client.get('/api/movies?mode=history')).json();self.assertEqual(history['movies'][0]['status'],'watching')
         self.assertEqual((await self.client.post('/api/movies',json={'action':'mark','id':'tm119206','status':'watched'})).status,200)
         history=await (await self.client.get('/api/movies?mode=history')).json();self.assertEqual(history['movies'][0]['status'],'watched')
+    async def test_only_authorized_playback_can_request_one_trusted_key(self):
+        import asyncio
+        await self.client.post('/api/connect');browser=await self.client.ws_connect('/api/browser')
+        await browser.send_json({'type':'movie-capabilities','version':1});await asyncio.sleep(.01)
+        remote=self.app['remote'];task=asyncio.create_task(remote.playback.command('movie-play',url='https://example.com/movie',movie=NODE['content']))
+        command=await browser.receive_json()
+        for ident in ('unrelated',command['requestId'],command['requestId']):await browser.send_json({'type':'movie-gesture','requestId':ident})
+        await browser.send_json({'requestId':command['requestId'],'ok':True,'tabId':4,'fullscreen':True})
+        await task;self.assertEqual(self.adapter.events,[('keys',['SPACE'])]);await browser.close()
