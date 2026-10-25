@@ -7,6 +7,7 @@ import re
 import sqlite3
 import time
 import unicodedata
+from contextlib import contextmanager
 from urllib.parse import quote_plus, urlsplit, parse_qs, urljoin
 from html.parser import HTMLParser
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
@@ -61,7 +62,12 @@ class Movies:
         with self.db() as db:
             db.executescript('CREATE TABLE IF NOT EXISTS movies(id TEXT PRIMARY KEY,data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS history(id TEXT PRIMARY KEY,status TEXT NOT NULL,updated REAL NOT NULL);')
         self.cache={};self.sessions={};self.lock=asyncio.Lock()
-    def db(self):return sqlite3.connect(self.path)
+    @contextmanager
+    def db(self):
+        connection=sqlite3.connect(self.path)
+        try:
+            with connection:yield connection
+        finally:connection.close()
     async def query(self,query,variables):
         async with ClientSession(connector=TCPConnector(resolver=PublicResolver()),timeout=ClientTimeout(total=9,connect=3),headers={'User-Agent':'SofaRemote movie discovery','Content-Type':'application/json'}) as client:
             async with client.post('https://apis.justwatch.com/graphql',json={'query':query,'variables':variables},allow_redirects=False) as response:
