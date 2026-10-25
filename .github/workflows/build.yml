@@ -23,12 +23,14 @@ jobs:
         run: |
           pip install playwright
           python -m playwright install --with-deps chromium
+          sudo apt-get install -y ffmpeg
           python tests/browser_playback_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Browser-playback-results
           path: .state/playback-smoke/*.png
+          include-hidden-files: true
   android:
     runs-on: ubuntu-latest
     steps:
