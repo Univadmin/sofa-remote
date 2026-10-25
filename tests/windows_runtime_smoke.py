@@ -52,7 +52,8 @@ def automatic_install_smoke():
         finally:
             (state/'watchdog.stop').write_text('stop')
             cleanup="$root=$env:SOFA_CLEAN_ROOT; Get-CimInstance Win32_Process | Where-Object { ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($root)) -or ($_.Name -eq 'powershell.exe' -and $_.CommandLine.Contains($root)) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
-            subprocess.run(['powershell.exe','-NoProfile','-Command',cleanup],env=dict(os.environ,SOFA_CLEAN_ROOT=str(root)),capture_output=True)
+            clean_env=dict(os.environ,SOFA_CLEAN_ROOT=str(root));clean_env.pop('PSModulePath',None)
+            subprocess.run(['powershell.exe','-NoProfile','-Command',cleanup],env=clean_env,capture_output=True)
             with winreg.CreateKey(winreg.HKEY_CURRENT_USER,r'Software\Microsoft\Windows\CurrentVersion\Run') as key:
                 try:winreg.DeleteValue(key,'SofaRemote')
                 except FileNotFoundError:pass
