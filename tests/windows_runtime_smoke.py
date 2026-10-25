@@ -27,7 +27,14 @@ def main():
         state=Path(temp);exe=state/'SofaRemote.exe';shutil.copy2('dist/UpdateFixture.exe',exe)
         port=18768;process=subprocess.Popen([str(exe),'--state',str(state),'--port',str(port)])
         try:
-            wait(lambda:healthy(port));data=json.loads((state/'started.json').read_text());assert data['phase']=='running'
+            print('Waiting for updated fixture',flush=True)
+            try:wait(lambda:healthy(port),seconds=45)
+            except Exception:
+                for log in (state/'updates').glob('*'):
+                    if log.suffix in ('.log','.json'):
+                        print(log.name,log.read_text(errors='replace'),flush=True)
+                raise
+            data=json.loads((state/'started.json').read_text());assert data['phase']=='running'
             assert data['argv']==['--state',str(state),'--port',str(port)],data
             wait(lambda:'server healthy' in (state/'updates/update.log').read_text())
             assert Path(str(exe)+'.previous').exists()
@@ -43,8 +50,10 @@ def main():
         os.environ.update(SOFA_TEST_STATE=str(watch),SOFA_TEST_PORT=str(port),SOFA_TEST_WATCH='1')
         worker=powershell(script,config)
         try:
+            print('Waiting for supervisor fixture',flush=True)
             wait(lambda:healthy(port));pid=json.loads((watch/'started.json').read_text())['pid']
             for _ in range(2):
+                print('Testing supervisor restart',_,flush=True)
                 try:urlopen(f'http://127.0.0.1:{port}/crash',timeout=2)
                 except OSError:pass
                 data=wait(lambda:(d if (d:=json.loads((watch/'started.json').read_text()))['pid']!=pid and healthy(port) else None))

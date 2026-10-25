@@ -91,9 +91,10 @@ try {
 
 def powershell(script, config):
     env=dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT='1')
-    return subprocess.Popen(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),str(config)],
+    with script.with_suffix('.launch.log').open('ab') as log:
+        return subprocess.Popen(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),str(config)],
         cwd=str(script.parent),env=env,creationflags=0x00000008|0x00000200,
-        stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,close_fds=True)
+        stdin=subprocess.DEVNULL,stdout=log,stderr=log,close_fds=True)
 
 def configure_startup(enabled, state):
     if os.name!='nt' or not getattr(sys,'frozen',False):raise ValueError('Paketli Windows EXE gereklidir')

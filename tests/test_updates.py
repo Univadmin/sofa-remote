@@ -35,3 +35,16 @@ class UpdateIntegrityTests(unittest.IsolatedAsyncioTestCase):
         updater=await self.check(b'changed-package!',b'complete-package')
         self.assertFalse(updater.status['ready']);self.assertEqual(updater.status['state'],'error')
         self.assertFalse(list(updater.state.glob('*.exe')));self.assertFalse(list(updater.state.glob('*.part')))
+
+class InstallHandshakeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_failed_helper_keeps_application_running(self):
+        import sys
+        tmp=tempfile.TemporaryDirectory();self.addCleanup(tmp.cleanup)
+        updater=Updater(tmp.name);updater.status.update(ready=True,latest='0.4.0')
+        (updater.state/'SofaRemote-0.4.0.exe').write_bytes(b'fixture')
+        process=SimpleNamespace(poll=lambda:1,terminate=lambda:None)
+        with patch('server.updater.os',SimpleNamespace(name='nt',getpid=lambda:123)),patch('server.updater.sys',SimpleNamespace(frozen=True,executable=sys.executable,argv=['SofaRemote.exe'])),patch('server.windows_runtime.powershell',return_value=process):
+            with self.assertRaisesRegex(ValueError,'yardımcısı'):
+                await updater.install()
+        self.assertEqual(updater.status['state'],'ready')
+        self.assertFalse((updater.state/'installing').exists())

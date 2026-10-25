@@ -71,6 +71,7 @@ class Updater:
         target=Path(sys.executable); staged=self.state/f'SofaRemote-{self.status["latest"]}.exe'
         if not staged.is_file():raise ValueError('Staged update missing')
         if self.status.get('state')=='installing':raise ValueError('Update already installing')
+        self.status['state']='installing'
         script=self.state/'apply-update.ps1';script.write_text(UPDATE_SCRIPT,encoding='utf-8-sig')
         ready=self.state/'helper.ready';ready.unlink(missing_ok=True)
         pause=self.state/'installing';pause.write_text(str(time.time()))
@@ -88,6 +89,7 @@ class Updater:
             process.terminate()
             raise ValueError('Güncelleme yardımcısı başlayamadı; PC kumandası açık bırakıldı')
         except Exception:
+            self.status['state']='ready'
             pause.unlink(missing_ok=True);raise
     async def background(self):
         while True:

@@ -262,7 +262,7 @@ async def ws_handler(request):
     r=request.app['remote']; ws=web.WebSocketResponse(heartbeat=15,max_msg_size=65536)
     try:
         await ws.prepare(request); r.sockets.add(ws)
-        await ws.send_json({'type':'hello','dryRun':isinstance(r.adapter,DryRun)})
+        await ws.send_json({'type':'hello','version':VERSION,'dryRun':isinstance(r.adapter,DryRun)})
         history=deque()
         async for msg in ws:
             if msg.type!=WSMsgType.TEXT: continue
