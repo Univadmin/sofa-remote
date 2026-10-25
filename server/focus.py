@@ -6,6 +6,12 @@ import time
 
 UIA_HELPERS = r'''Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+# Load the standard Win32/Windows Forms client-side accessibility providers.
+try {
+ Add-Type -AssemblyName UIAutomationClientsideProviders
+ $proxy=[AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq 'UIAutomationClientsideProviders' } | Select-Object -First 1
+ if($proxy){[System.Windows.Automation.ClientSettings]::RegisterClientSideProviderAssembly($proxy.GetName())}
+} catch {}
 function Get-EditFocus($Element) {
   $active=$false;$identity='';$kind='';$errorType=''
   try {
