@@ -33,7 +33,11 @@ public class RemoteInteractionTest {
     }
     private void screenshot(String name)throws Exception{
         android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
-        if(bitmap!=null){java.io.File path=new java.io.File(rule.getActivity().getExternalFilesDir(null),name+".png");try(java.io.FileOutputStream output=new java.io.FileOutputStream(path)){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,output);}}
+        if(bitmap!=null){
+            android.content.ContentValues values=new android.content.ContentValues();values.put(android.provider.MediaStore.Images.Media.DISPLAY_NAME,name+".png");values.put(android.provider.MediaStore.Images.Media.MIME_TYPE,"image/png");values.put(android.provider.MediaStore.Images.Media.RELATIVE_PATH,"Pictures/SofaRemoteTests");
+            android.content.ContentResolver resolver=rule.getActivity().getContentResolver();android.net.Uri image=resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,values);
+            if(image!=null)try(java.io.OutputStream output=resolver.openOutputStream(image)){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,output);}
+        }
     }
     @After public void captureResult()throws Exception{screenshot("interaction-"+SystemClock.uptimeMillis());}
     private void hold(String selector)throws Exception{
@@ -62,6 +66,6 @@ public class RemoteInteractionTest {
         js("fetch('/__focus',{method:'POST'});true");
         waitFor(()->{boolean[] ready=new boolean[1];InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{View focus=rule.getActivity().getCurrentFocus();ready[0]=focus instanceof EditText&&focus.getRootWindowInsets()!=null&&focus.getRootWindowInsets().isVisible(WindowInsets.Type.ime());});return ready[0];});
         screenshot("native-keyboard");onView(withHint("PC’ye yaz…")).perform(typeText("abc"));
-        waitFor(()->"\"abc\"".equals(js("testSent.filter(x=>x.type==='edit').map(x=>x.text).join('')")));
+        try{waitFor(()->"\"abc\"".equals(js("testSent.filter(x=>x.type==='edit').map(x=>x.text).join('')")));}catch(AssertionError error){throw new AssertionError(js("JSON.stringify(testSent)"),error);}
     }
 }

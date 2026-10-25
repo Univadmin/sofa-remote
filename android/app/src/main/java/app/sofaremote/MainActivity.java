@@ -86,6 +86,7 @@ public class MainActivity extends Activity {
         if(remoteEditor==null){
             keyboardBar=new LinearLayout(this);keyboardBar.setPadding(10,2,10,2);keyboardBar.setBackgroundColor(Color.rgb(27,32,45));
             remoteEditor=new EditText(this){
+                @Override public boolean onKeyDown(int key,KeyEvent event){if(key==KeyEvent.KEYCODE_DEL&&length()==0){nativeKey("BACKSPACE");return true;}return super.onKeyDown(key,event);}
                 @Override public android.view.inputmethod.InputConnection onCreateInputConnection(android.view.inputmethod.EditorInfo info){
                     android.view.inputmethod.InputConnection base=super.onCreateInputConnection(info);
                     return new android.view.inputmethod.InputConnectionWrapper(base,false){
@@ -102,7 +103,7 @@ public class MainActivity extends Activity {
                 public void beforeTextChanged(CharSequence s,int start,int count,int after){}
                 public void onTextChanged(CharSequence s,int start,int before,int count){}
                 public void afterTextChanged(android.text.Editable value){
-                    if(changingEditor||android.view.inputmethod.BaseInputConnection.getComposingSpanStart(value)>=0)return;
+                    if(changingEditor)return;
                     String next=value.toString();LiveTextDelta delta=LiveTextDelta.between(editorPrevious,next);editorPrevious=next;
                     if(delta.delete==0&&delta.text.isEmpty())return;
                     try{JSONObject detail=new JSONObject();detail.put("delete",delta.delete);detail.put("text",delta.text);emit("sofa-native-edit",detail.toString());}catch(Exception ignored){}

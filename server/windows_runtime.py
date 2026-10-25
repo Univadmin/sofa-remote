@@ -89,7 +89,7 @@ try {
 } finally { $mutex.ReleaseMutex(); $mutex.Dispose() }
 '''
 
-def powershell(script, config):
+def powershell(script, config, *, mta=False):
     env=dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT='1')
     # Windows propagates PyInstaller's DLL search directory to child processes.
     # External system tools must use Windows DLLs, not bundled application DLLs.
@@ -101,7 +101,7 @@ def powershell(script, config):
         kernel.SetDllDirectoryW(None)
     try:
         with script.with_suffix('.launch.log').open('ab') as log:
-            return subprocess.Popen(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),str(config)],
+            return subprocess.Popen(['powershell.exe',*(['-Mta'] if mta else []),'-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),str(config)],
                 cwd=str(script.parent),env=env,creationflags=0x00000200|0x08000000,
                 stdin=subprocess.DEVNULL,stdout=log,stderr=log,close_fds=True)
     finally:

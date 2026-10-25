@@ -4,35 +4,42 @@ import os
 from pathlib import Path
 import time
 
-FOCUS_SCRIPT = r'''param([string]$Config)
-$ErrorActionPreference = 'Stop'
-$c=Get-Content -LiteralPath $Config -Raw -Encoding UTF8 | ConvertFrom-Json
-Add-Type -AssemblyName UIAutomationClient
+UIA_HELPERS = r'''Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
-$parent=Get-Process -Id $c.ProcessId
-while (!$parent.HasExited) {
-  $active=$false; $identity='';$kind='';$errorType=''
+function Get-EditFocus($Element) {
+  $active=$false;$identity='';$kind='';$errorType=''
   try {
-    $element=[System.Windows.Automation.AutomationElement]::FocusedElement
-    if ($element) { $kind=$element.Current.ControlType.ProgrammaticName }
-    if ($element -and $element.Current.IsEnabled -and $element.Current.IsKeyboardFocusable) {
-      $type=$element.Current.ControlType
+    if ($Element) { $kind=$Element.Current.ControlType.ProgrammaticName }
+    if ($Element -and $Element.Current.IsEnabled -and $Element.Current.IsKeyboardFocusable) {
+      $type=$Element.Current.ControlType
       if ($type -eq [System.Windows.Automation.ControlType]::Edit -or $type -eq [System.Windows.Automation.ControlType]::ComboBox -or $type -eq [System.Windows.Automation.ControlType]::Document) {
         $pattern=$null
-        if ($element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$pattern)) {
+        if ($Element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$pattern)) {
           $active=!$pattern.Current.IsReadOnly
         } elseif ($type -eq [System.Windows.Automation.ControlType]::Edit) {
           $active=$true
-        } elseif ($element.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern,[ref]$pattern)) {
+        } elseif ($Element.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern,[ref]$pattern)) {
           $readOnly=$pattern.DocumentRange.GetAttributeValue([System.Windows.Automation.TextPattern]::IsReadOnlyAttribute)
           $active=($readOnly -is [bool] -and !$readOnly)
         }
-        if ($active) { $identity=($element.Current.ProcessId.ToString()+':'+($element.GetRuntimeId() -join '.')) }
+        if ($active) { $identity=($Element.Current.ProcessId.ToString()+':'+($Element.GetRuntimeId() -join '.')) }
       }
     }
   } catch { $errorType=$_.Exception.Message }
   # No names, field values or password contents are queried.
-  $json=@{active=$active;identity=$identity;controlType=$kind;error=$errorType} | ConvertTo-Json -Compress
+  return @{active=$active;identity=$identity;controlType=$kind;error=$errorType}
+}
+'''
+
+FOCUS_SCRIPT = r'''param([string]$Config)
+$ErrorActionPreference = 'Stop'
+$c=Get-Content -LiteralPath $Config -Raw -Encoding UTF8 | ConvertFrom-Json
+''' + UIA_HELPERS + r'''
+$parent=Get-Process -Id $c.ProcessId
+while (!$parent.HasExited) {
+  try { $state=Get-EditFocus ([System.Windows.Automation.AutomationElement]::FocusedElement) }
+  catch { $state=@{active=$false;identity='';error=$_.Exception.Message} }
+  $json=$state | ConvertTo-Json -Compress
   try {
     [IO.File]::WriteAllText($c.State+'.tmp',$json,(New-Object Text.UTF8Encoding($false)))
     Move-Item -LiteralPath ($c.State+'.tmp') -Destination $c.State -Force
@@ -52,7 +59,7 @@ class FocusMonitor:
         self.file.unlink(missing_ok=True)
         script=self.state/'focus.ps1';script.write_text(FOCUS_SCRIPT,encoding='utf-8-sig')
         config=self.state/'focus-config.json';config.write_text(json.dumps({'ProcessId':os.getpid(),'State':str(self.file)}),encoding='utf-8')
-        self.process=powershell(script,config)
+        self.process=powershell(script,config,mta=True)
     def focused(self):
         try:
             if time.time()-self.file.stat().st_mtime>4:return None
