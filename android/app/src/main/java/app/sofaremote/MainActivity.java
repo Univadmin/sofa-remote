@@ -19,7 +19,7 @@ public class MainActivity extends Activity {
     private LinearLayout deviceList;
     private String server="";
     private boolean scanning=false,showingDevices=false,paused=false;
-    private int failures=0;
+    private int failures=0,connectionGeneration=0;
     private final android.os.Handler handler=new android.os.Handler(android.os.Looper.getMainLooper());
     private UpdateManager updater;
     private android.content.BroadcastReceiver downloadReceiver;
@@ -35,9 +35,9 @@ public class MainActivity extends Activity {
         updater.check();
     }
     private void showConnecting(){TextView text=new TextView(this);text.setText("Sofa Remote\nBilgisayara bağlanıyor…");text.setTextColor(Color.WHITE);text.setBackgroundColor(Color.rgb(16,19,27));text.setGravity(Gravity.CENTER);setContentView(text);}
-    private void tryLast(){new Thread(()->{JSONObject info=Discovery.probe(server);runOnUiThread(()->{if(isFinishing())return;if(info!=null)openServer(server);else showDevices();});},"sofa-reconnect").start();}
+    private void tryLast(){final int generation=++connectionGeneration;final String address=server;new Thread(()->{JSONObject info=Discovery.probe(address);runOnUiThread(()->{if(isFinishing()||isDestroyed()||generation!=connectionGeneration)return;if(info!=null)openServer(address);else showDevices();});},"sofa-reconnect").start();}
     private void showDevices(){
-        showingDevices=true;
+        connectionGeneration++;showingDevices=true;
         if(web!=null){web.evaluateJavascript("window.dispatchEvent(new Event('sofa-pause'))",null);web.destroy();web=null;}
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(30,50,30,20);root.setBackgroundColor(Color.rgb(16,19,27));
         TextView heading=new TextView(this);heading.setText("sofa remote\nBilgisayarını seç");heading.setTextSize(26);heading.setTextColor(Color.WHITE);root.addView(heading);
@@ -50,7 +50,7 @@ public class MainActivity extends Activity {
     private void scanDevices(){if(scanning)return;scanning=true;deviceList.removeAllViews();Discovery.scan(this,(address,name)->runOnUiThread(()->{if(!showingDevices||isFinishing())return;Button b=new Button(this);b.setText(name+"\n"+address);b.setOnClickListener(v->openServer(address));deviceList.addView(b);}),()->runOnUiThread(()->{scanning=false;if(showingDevices&&deviceList.getChildCount()==0){TextView text=new TextView(this);text.setText("Bilgisayar bulunamadı. Windows’ta Sofa Remote açık olmalı; özel ağ güvenlik duvarı TCP 8765 / UDP 8766 bağlantısına izin vermeli.");text.setTextColor(Color.LTGRAY);deviceList.addView(text);}}));}
     private void askAddress(){EditText input=new EditText(this);input.setSingleLine(true);input.setHint("http://192.168.1.20:8765");input.setText(server);new AlertDialog.Builder(this).setTitle("Bilgisayar adresi").setView(input).setPositiveButton("Bağlan",(d,w)->{String value=input.getText().toString().trim().replaceAll("/+$","");if(!Discovery.localUrl(value)){Toast.makeText(this,"Yerel ağ IPv4 adresi gir",Toast.LENGTH_LONG).show();return;}server=value;showConnecting();tryLast();}).setNegativeButton("İptal",null).show();}
     void openServer(String address){
-        if(!Discovery.localUrl(address))return;showingDevices=false;failures=0;server=address;getPreferences(0).edit().putString("server",server).apply();
+        if(!Discovery.localUrl(address))return;connectionGeneration++;showingDevices=false;failures=0;server=address;getPreferences(0).edit().putString("server",server).apply();
         if(web!=null)web.destroy();remoteEditor=null;keyboardBar=null;web=new WebView(this);web.setBackgroundColor(Color.rgb(16,19,27));
         web.clearCache(true);web.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
         web.getSettings().setJavaScriptEnabled(true);web.getSettings().setDomStorageEnabled(true);web.getSettings().setAllowFileAccess(false);web.getSettings().setAllowContentAccess(false);web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
                     if("https".equals(target.getScheme())&&request.isForMainFrame())startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,request.getUrl()));
                 }catch(Exception ignored){}return true;
             }
-            @Override public void onReceivedError(WebView v,WebResourceRequest request,WebResourceError error){if(request.isForMainFrame()&&!showingDevices)handler.postDelayed(()->{if(web!=null&&!showingDevices){if(++failures>=2)showDevices();else web.reload();}},1500);}
+            @Override public void onReceivedError(WebView v,WebResourceRequest request,WebResourceError error){if(request.isForMainFrame()&&!showingDevices)handler.postDelayed(()->{if(web==v&&!showingDevices){if(++failures>=2)showDevices();else web.reload();}},1500);}
         });
         serverRoot=new LinearLayout(this);serverRoot.setOrientation(LinearLayout.VERTICAL);
         serverRoot.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(serverRoot);web.loadUrl(server);
