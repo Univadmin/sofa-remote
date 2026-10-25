@@ -18,7 +18,9 @@ final class UpdateManager {
     private volatile String message="Güncellemeler kontrol ediliyor",latest="",state="idle";
     private AlertDialog dialog;
     private static final String RELEASE="https://api.github.com/repos/Univadmin/sofa-remote/releases/latest";
-    UpdateManager(MainActivity activity){this.activity=activity;prefs=activity.getSharedPreferences("updates",0);String version="";try{version=activity.getPackageManager().getPackageInfo(activity.getPackageName(),0).versionName;}catch(Exception ignored){}current=version;latest=current;}
+    UpdateManager(MainActivity activity){this.activity=activity;prefs=activity.getSharedPreferences("updates",0);String version="";try{version=activity.getPackageManager().getPackageInfo(activity.getPackageName(),0).versionName;}catch(Exception ignored){}current=version;latest=current;
+        if(compare(prefs.getString("version",""),current)<=0)prefs.edit().putBoolean("ready",false).remove("download").remove("pendingInstall").remove("offered").apply();
+    }
     JSONObject snapshot(){JSONObject json=new JSONObject();try{json.put("current",current).put("latest",latest).put("state",state).put("message",message).put("ready",prefs.getBoolean("ready",false));}catch(Exception ignored){}return json;}
     void publish(){activity.updateStatus(snapshot());activity.runOnUiThread(()->{if(dialog!=null&&dialog.isShowing())dialog.setMessage(versionText());});}
     private void status(String phase,String text){state=phase;message=text;publish();}

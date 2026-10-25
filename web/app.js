@@ -99,7 +99,7 @@ function setupMouse(root){
 }
 function setupFullMouse(){
  globalMouse=new MouseGesture(gestureOptions({releaseClick:()=>true,lefty:()=>false,manual:()=>false}));let suppressUntil=0;const owners=new Set();
- const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('input,textarea,select,[contenteditable=true]');
+ const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.topbar,input,textarea,select,[contenteditable=true]');
  document.addEventListener('pointerdown',e=>{if(!allowed(e))return;owners.add(e.pointerId);if(e.target.closest('button,a,summary,label'))globalMouse.lastTap=null;globalMouse.down(e)},{capture:true});
  document.addEventListener('pointermove',e=>{if(!owners.has(e.pointerId))return;globalMouse.move(e);if(e.cancelable&&globalMouse.gesture?.moved)e.preventDefault()},{capture:true,passive:false});
  document.addEventListener('pointerup',e=>{if(!owners.delete(e.pointerId))return;
