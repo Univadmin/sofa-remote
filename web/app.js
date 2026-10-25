@@ -20,13 +20,13 @@ function send(action,wait=false){
   const id=++sequence;ws.send(JSON.stringify({...action,id}));if(!wait)return;
   return new Promise((resolve,reject)=>{const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Komut zaman aşımı'))},25000);pending.set(id,{resolve,reject,timer})});
 }
-function resetTextInputs(){for(const area of $$('.keyboard-live')){area.value='';area.dataset.previous=''}}
+function resetTextInputs(){window.SofaNative?.resetKeyboard?.();for(const area of $$('.keyboard-live')){area.value='';area.dataset.previous=''}}
 function resetLive(){globalMouse?.reset();resetTextInputs();for(const box of $$('[data-drag]'))box.checked=false;for(const pad of $$('.touchpad'))pad.dispatchEvent(new Event('sofa-reset'))}
 function connect(){
   clearTimeout(retry);if(stopped)return;if(ws?.readyState===0||ws?.readyState===1)return;
   ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/api/ws`);
   ws.onopen=()=>{status('Bağlı',true);resetLive();window.SofaNative?.connectionReady();refreshGlobalTabs()};
-  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='server-restarting'){restartUntil=Date.now()+300000;status('Bilgisayar güncelleniyor…');return}if(d.type==='keyboard-focus'){if(d.active)openPhoneKeyboard();return}if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.version&&d.version!=='0.3.2'){location.reload();return}if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
+  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='server-restarting'){restartUntil=Date.now()+300000;status('Bilgisayar güncelleniyor…');return}if(d.type==='keyboard-focus'){if(d.active)openPhoneKeyboard();return}if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.version&&d.version!=='0.3.3'){location.reload();return}if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
   ws.onclose=()=>{for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('Bağlantı kesildi'))}pending.clear();resetLive();status(stopped?'Bağlantı kesildi':'Tekrar bağlanıyor');if(!stopped)retry=setTimeout(load,2000)};
   ws.onerror=()=>status('Bilgisayar aranıyor');
 }
@@ -98,24 +98,35 @@ function setupMouse(root){
  root.querySelector('[data-speed]').onchange=e=>storage.set('speed',Number(e.target.value));root.querySelector('[data-lefty]').onchange=e=>storage.set('lefty',e.target.checked);
 }
 function setupFullMouse(){
- globalMouse=new HoldMouse(gestureOptions({delay:(f,ms)=>setTimeout(f,ms),cancelDelay:id=>clearTimeout(id),activate:()=>{suppressUntil=performance.now()+700;window.SofaNative?.vibrate?.()}}));let suppressUntil=0;const owners=new Map();
- const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.touchpad,#top-tabs,input,textarea,select,[contenteditable=true]');
+ let suppressUntil=0,replaying=false;const owners=new Map();
+ globalMouse=new HoldMouse(gestureOptions({delay:(f,ms)=>setTimeout(f,ms),cancelDelay:id=>clearTimeout(id),activate:()=>{window.getSelection()?.removeAllRanges();suppressUntil=performance.now()+900;window.SofaNative?.vibrate?.()}}));
+ const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.touchpad,#top-tabs,select,input[type=range],input[type=checkbox]');
  document.addEventListener('pointerdown',e=>{
-  if(!allowed(e))return;const scroll=e.target.closest('.favorites,.tabstrip,.pane-content');owners.set(e.pointerId,scroll);
-  if(globalMouse.down(e)){suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
+  if(!allowed(e))return;
+  if(e.cancelable)e.preventDefault();
+  owners.set(e.pointerId,{scroll:e.target.closest('.favorites,.pane-content'),target:e.target.closest('button,a,summary,label,input,textarea,[contenteditable=true]')});
+  globalMouse.down(e);
  },{capture:true,passive:false});
  document.addEventListener('pointermove',e=>{
   if(!owners.has(e.pointerId))return;const result=globalMouse.move(e);if(!result)return;
-  if(result.active){suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
-  else if(result.moved){const scroll=owners.get(e.pointerId);if(scroll){if(scroll.matches('.favorites,.tabstrip'))scroll.scrollLeft-=result.dx;else scroll.scrollTop-=result.dy;}}
+  if(e.cancelable)e.preventDefault();
+  if(result.active)suppressUntil=performance.now()+900;
+  else if(result.moved){const scroll=owners.get(e.pointerId).scroll;if(scroll){if(scroll.matches('.favorites'))scroll.scrollLeft-=result.dx;else scroll.scrollTop-=result.dy;}}
  },{capture:true,passive:false});
  document.addEventListener('pointerup',e=>{
-  if(!owners.delete(e.pointerId))return;const result=globalMouse.up(e);
-  if(result?.active||result?.moved){suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
+  const owner=owners.get(e.pointerId);if(!owner)return;owners.delete(e.pointerId);
+  const result=globalMouse.up(e);if(!result)return;
+  if(e.cancelable)e.preventDefault();suppressUntil=performance.now()+900;
+  if(!result.active&&!result.moved&&owner.target?.isConnected){
+   replaying=true;
+   if(owner.target.matches('input,textarea,[contenteditable=true]')){owner.target.focus({preventScroll:true});if(owner.target.matches('.keyboard-live'))window.SofaNative?.showKeyboard?.()}
+   else owner.target.click();
+   replaying=false;
+  }
  },{capture:true,passive:false});
  document.addEventListener('pointercancel',e=>{if(owners.has(e.pointerId)){owners.clear();globalMouse.reset()}},true);
- document.addEventListener('contextmenu',e=>{if(allowed(e)){e.preventDefault();e.stopImmediatePropagation()}},true);
- document.addEventListener('click',e=>{if(fullMouse&&!$('#sheet').open&&performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation()}},true);
+ for(const name of ['contextmenu','selectstart','dragstart'])document.addEventListener(name,e=>{if(allowed(e)){e.preventDefault();e.stopImmediatePropagation()}},true);
+ document.addEventListener('click',e=>{if(!replaying&&fullMouse&&!$('#sheet').open&&performance.now()<suppressUntil&&!e.target.closest('#top-tabs')){e.preventDefault();e.stopImmediatePropagation()}},true);
  document.body.classList.toggle('full-mouse',fullMouse);
 }
 
@@ -132,15 +143,29 @@ function iconElement(item){const span=document.createElement('span'),url=item.ta
 async function refreshGlobalTabs(){if(ws?.readyState!==1)return;try{applyTabs(await send({type:'tabs'},true))}catch{}}
 function applyTabs(result){const fingerprint=JSON.stringify([result.connected,result.tabs]);tabsState={tabs:result.tabs||[],connected:!!result.connected};if(fingerprint===tabsFingerprint)return;tabsFingerprint=fingerprint;renderTopTabs();renderFavorites();for(const root of $$('.controller'))if(root.querySelector('[data-tabs]'))renderTabsList(root)}
 function renderTopTabs(){const strip=$('#top-tabs');strip.replaceChildren();if(!tabsState.tabs.length){const empty=document.createElement('span');empty.className='empty-tabs';empty.textContent='▣';empty.title='Açık tarayıcı sekmesi yok';strip.append(empty);return}
- for(const tab of tabsState.tabs){const b=document.createElement('button');b.className=tab.active?'active':'';b.setAttribute('aria-label',tab.title||'Sekmeye geç');b.setAttribute('aria-pressed',String(tab.active));b.title=tab.title||tab.url;b.append(iconElement({tab,icon:'🌐'}));b.onclick=()=>{if(!b._held)run({type:'tab',action:'activate',tabId:tab.id}).catch(e=>toast(e.message))};setupTabHold(b,tab);strip.append(b)}
+ for(const tab of tabsState.tabs){const b=document.createElement('button');b.className=tab.active?'active':'';b.setAttribute('aria-label',tab.title||'Sekmeye geç');b.setAttribute('aria-pressed',String(tab.active));b.title=tab.title||tab.url;b.append(iconElement({tab,icon:'🌐'}));b.onclick=()=>{if(!b._held&&!b._skipClick)run({type:'tab',action:'activate',tabId:tab.id}).catch(e=>toast(e.message))};setupTabHold(b,tab);strip.append(b)}
 }
 
+async function closeTopTab(tabId){
+ try{await run({type:'tab',action:'close',tabId});if($('#sheet').open)$('#sheet').close();await refreshGlobalTabs();toast('Sekme kapatıldı')}
+ catch(e){toast('Sekme kapatılamadı: '+e.message)}
+}
+window.addEventListener('sofa-tab-close',e=>closeTopTab(Number(e.detail)));
 function setupTabHold(button,tab){
  let timer,start;
  const cancel=()=>{clearTimeout(timer);timer=null};
- button.addEventListener('pointerdown',e=>{button._held=false;start={x:e.clientX,y:e.clientY};timer=setTimeout(()=>{button._held=true;sheet('Sekme',`<p>${escaped(tab.title||tab.url||'Sekme')}</p><button id="close-top-tab" class="wide">Sekmeyi kapat</button>`);$('#close-top-tab').onclick=async()=>{try{await run({type:'tab',action:'close',tabId:tab.id});$('#sheet').close();await refreshGlobalTabs()}catch(e){toast(e.message)}}},550)});
+ button.addEventListener('pointerdown',e=>{
+  button._held=false;start={x:e.clientX,y:e.clientY};
+  if(e.pointerType==='touch'&&e.cancelable)e.preventDefault();
+  timer=setTimeout(()=>{
+   button._held=true;window.getSelection()?.removeAllRanges();
+   if(window.SofaNative?.tabMenu){release();window.SofaNative.tabMenu(tab.id,tab.title||tab.url||'Sekme');return}
+   sheet('Sekme',`<p>${escaped(tab.title||tab.url||'Sekme')}</p><button id="close-top-tab" class="wide">Sekmeyi kapat</button>`);$('#close-top-tab').onclick=()=>closeTopTab(tab.id);
+  },450);
+ });
  button.addEventListener('pointermove',e=>{if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>10)cancel()});
- for(const name of ['pointerup','pointercancel','pointerleave'])button.addEventListener(name,cancel);
+ button.addEventListener('pointerup',e=>{cancel();if(e.pointerType==='touch'){e.preventDefault();if(!button._held)run({type:'tab',action:'activate',tabId:tab.id}).catch(e=>toast(e.message));button._skipClick=true;setTimeout(()=>button._skipClick=false,700)}});
+ for(const name of ['pointercancel','pointerleave'])button.addEventListener(name,cancel);
  button.addEventListener('contextmenu',e=>e.preventDefault());
 }
 
@@ -186,6 +211,9 @@ function openPhoneKeyboard(){
  resetTextInputs();
  let field=document.querySelector('.keyboard-live');
  if(!field){paneTypes[1]='keyboard';storage.set('panes',paneTypes);renderPane(1);field=document.querySelector('#pane-1 .keyboard-live')}
- field.focus({preventScroll:true});window.SofaNative?.showKeyboard?.();
+ if(window.SofaNative?.showKeyboard){window.SofaNative.showKeyboard();return}field.focus({preventScroll:true});
  if(!window.SofaNative)toast('Yazmak için klavye alanına dokun');
 }
+
+window.addEventListener('sofa-native-edit',e=>{send({type:'edit',delete:e.detail.delete,text:e.detail.text})});
+window.addEventListener('sofa-native-key',e=>send({type:'keys',keys:[e.detail]}));

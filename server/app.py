@@ -19,6 +19,7 @@ from .version import VERSION, REPOSITORY
 from .updater import Updater
 from .discovery import start_discovery
 from .icons import Icons
+from .focus import FocusMonitor
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent.parent))
 STATE = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'SofaRemote'
@@ -340,11 +341,13 @@ def main():
             if not context: discovery=await start_discovery(args.port)
         except OSError: print('Ağ keşfi başlatılamadı; telefon adresle bağlanabilir.')
         task=asyncio.create_task(app['remote'].updater.background()) if not args.dry_run else None
+        monitor=FocusMonitor(app['remote'].state)
+        if not args.dry_run:monitor.start()
         async def watch_focus():
             previous=None
             while True:
                 try:
-                    current=app['remote'].adapter.keyboard_focus()
+                    current=monitor.focused() or app['remote'].adapter.keyboard_focus()
                     if current!=previous:
                         previous=current
                         await asyncio.gather(*(client.send_json({'type':'keyboard-focus','active':bool(current)}) for client in list(app['remote'].sockets) if not client.closed),return_exceptions=True)
@@ -354,6 +357,7 @@ def main():
         yield
         if focus_task:
             focus_task.cancel(); await asyncio.gather(focus_task,return_exceptions=True)
+        monitor.close()
         if task:
             task.cancel()
             await asyncio.gather(task,return_exceptions=True)

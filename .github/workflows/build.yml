@@ -55,6 +55,43 @@ jobs:
         with:
           name: Sofa-Remote-Android
           path: dist/SofaRemote-Android.apk
+  android-interaction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Start isolated remote server
+        run: PYTHONPATH=. python tests/android_smoke_server.py > /tmp/sofa-android.log 2>&1 &
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            adb shell settings put secure show_ime_with_hard_keyboard 1
+            gradle -p android connectedDebugAndroidTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Android-interaction-results
+          path: android/app/build/reports/androidTests/connected/
   windows:
     runs-on: windows-latest
     steps:
@@ -64,6 +101,9 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt pyinstaller
       - run: python -m unittest discover -s tests -v
+      - run: python tests/windows_focus_smoke.py
+        env:
+          PYTHONPATH: .
       - run: pyinstaller --noconfirm --onefile --name SofaRemote --collect-all aiohttp --add-data "web;web" run.py
       - run: pyinstaller --noconfirm --onefile --name UpdateFixture --paths . tests/windows_update_fixture.py
       - run: python tests/windows_runtime_smoke.py

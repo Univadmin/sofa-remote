@@ -4,3 +4,8 @@
 .full-mouse .topbar,.full-mouse .topbar *{touch-action:none}
 
 .full-mouse #top-tabs,.full-mouse #top-tabs *{touch-action:pan-x}
+
+body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,[contenteditable=true]{-webkit-user-select:text;user-select:text}
+.full-mouse input,.full-mouse textarea,.full-mouse [contenteditable=true]{-webkit-user-select:none;user-select:none}
+#top-tabs,#top-tabs *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
