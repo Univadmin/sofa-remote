@@ -126,6 +126,12 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         event=await phone.receive_json(timeout=2)
         self.assertEqual(event,{'type':'keyboard-focus','active':True})
         await phone.close();await browser.close()
+    async def test_connect_while_pc_edit_field_already_focused(self):
+        self.app['remote'].keyboard_focus='uia:100:42'
+        await self.connect();phone=await self.client.ws_connect('/api/ws')
+        self.assertEqual((await phone.receive_json())['type'],'hello')
+        self.assertEqual(await phone.receive_json(),{'type':'keyboard-focus','active':True})
+        await phone.close()
     async def test_expired_session(self):
         await self.connect();self.app['remote'].tokens.clear();self.assertEqual((await self.client.get('/api/shortcuts')).status,401)
     async def test_invalid_macro(self):

@@ -9,12 +9,31 @@ from server.windows_runtime import powershell
 FORM = r'''param([string]$Config)
 $c=Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json
 Add-Type -AssemblyName System.Windows.Forms
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class ForegroundFixture {
+ [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+ [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr window, IntPtr pid);
+ [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
+ [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint from, uint to, bool attach);
+ [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr window);
+}
+'@
 $form=New-Object Windows.Forms.Form
 $form.Text='Sofa Remote focus test';$form.Width=400;$form.Height=200;$form.TopMost=$true
 $box=New-Object Windows.Forms.TextBox;$box.Width=300;$form.Controls.Add($box)
 $form.Add_Shown({$form.Activate();$box.Focus() | Out-Null})
 $timer=New-Object Windows.Forms.Timer;$timer.Interval=250
-$timer.Add_Tick({$form.Activate();$box.Focus() | Out-Null;if(Test-Path -LiteralPath $c.Mode){$box.ReadOnly=$true}});$timer.Start()
+$timer.Add_Tick({
+ $current=[ForegroundFixture]::GetCurrentThreadId()
+ $foreground=[ForegroundFixture]::GetWindowThreadProcessId([ForegroundFixture]::GetForegroundWindow(),[IntPtr]::Zero)
+ $attached=$false
+ if($current -ne $foreground){$attached=[ForegroundFixture]::AttachThreadInput($current,$foreground,$true)}
+ [ForegroundFixture]::SetForegroundWindow($form.Handle) | Out-Null
+ $box.Focus() | Out-Null
+ if($attached){[ForegroundFixture]::AttachThreadInput($current,$foreground,$false) | Out-Null}
+ if(Test-Path -LiteralPath $c.Mode){$box.ReadOnly=$true}});$timer.Start()
 [Windows.Forms.Application]::Run($form)
 '''
 

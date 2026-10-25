@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check web/app.js && node --check browser/background.js && node --test tests/gestures.test.cjs
+      - run: node --check web/app.js && node --check browser/background.js && node --test tests/gestures.test.cjs tests/browser.test.cjs
   android:
     runs-on: ubuntu-latest
     steps:
@@ -84,14 +84,16 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: |
-            adb shell settings put secure show_ime_with_hard_keyboard 1
-            gradle -p android connectedDebugAndroidTest
+          script: bash scripts/test-android-interaction.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Android-interaction-results
-          path: android/app/build/reports/androidTests/connected/
+          path: |
+            android/app/build/reports/androidTests/connected/
+            android-interaction-screenshots/
+            android-interaction-logcat.txt
+            android-interaction-server.log
   windows:
     runs-on: windows-latest
     steps:

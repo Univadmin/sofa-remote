@@ -1,4 +1,5 @@
 'use strict';
+if(!Element.prototype.replaceChildren)Element.prototype.replaceChildren=function(...children){this.textContent='';this.append(...children)};
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const labels={mouse:'⌖ Mouse',media:'▶ Medya',keyboard:'⌨ Klavye',browser:'▣ Tarayıcı / Sekmeler',apps:'▦ Uygulamalar',commands:'☷ Tüm butonlar',tools:'⚙ Araçlar',downloads:'↻ Güncelleme'};
 const storage={get:(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}},set:(key,value)=>localStorage.setItem(key,JSON.stringify(value))};

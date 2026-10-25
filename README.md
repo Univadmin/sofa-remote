@@ -51,7 +51,7 @@ Birden fazla telefon aynı PC’ye eşzamanlı bağlanabilir. Her telefonun bas�
 
 Ekran iki sabit alana ayrılır. Her alanın üstündeki listeden bağımsız kumanda seç: **Mouse + Medya**, **Klavye + Tarayıcı**, **Mouse + Uygulamalar** gibi. Düzen düğmesiyle üst üste veya yan yana görünümü seç. Tercihler hatırlanır; paneller kendi içlerinde kayar.
 
-- **Mouse:** touchpad, sol/sağ/orta tık, iki parmak kaydırma, hız ve solak ayarı. Çift dokunup ikinci dokunuşu basılı tutarak klasör veya pencere sürükle. **Düzen → Bütün ekranı mouse olarak kullan** açıkken yarım saniye basılı tut, ardından kaydır; bıraktığında sol tık gönderilir. Tek dokunuş uygulamayı normal kullanır. Normal mouse yüzeyi bu ayardan bağımsız çalışır.
+- **Mouse:** touchpad, sol/sağ/orta tık, iki parmak kaydırma, hız ve solak ayarı. Çift dokunup ikinci dokunuşu basılı tutarak klasör veya pencere sürükle. **Düzen → Bütün ekranı mouse olarak kullan** açıkken yarım saniye basılı tut, ardından kaydır; bıraktığında sol tık gönderilir. Tek dokunuş uygulamayı normal kullanır. Metinlerin ve yazı alanlarının üzerinde basılı tutmak da tam ekran mouse’u başlatır; kısa dokunuşla alanı normal kullanabilirsin. Normal mouse yüzeyi bu ayardan bağımsız çalışır.
 - **Klavye:** telefon klavyesiyle anlık yazma, silme, Enter; Ctrl/Alt/Shift/Win, F1–F12 ve özel birleşimler. Yazı alanında yapılan değişiklikler PC’deki odaklanmış alana gönderilir. PC imlecini başka yolla taşırsan **Yeni alan** düğmesine dokun.
 - **Medya:** ses, sessiz, oynat/duraklat; genel site, YouTube ve Netflix profilleri. Android uygulaması ön plandayken telefonun ses düğmeleri PC sesini değiştirir.
 - **Tarayıcı / Sekmeler:** gezinme, sekme açma/kapatma/geçiş; eklenti bağlıysa sekmeleri adlarıyla listeleme, doğrudan seçme, yenileme ve kopyalama.
@@ -59,7 +59,7 @@ Ekran iki sabit alana ayrılır. Her alanın üstündeki listeden bağımsız ku
 - **Tüm butonlar:** aranabilir komut kataloğu. Desteklenen komutlar `+` düğmesiyle kısayola eklenebilir.
 - **Araçlar:** ekran önizlemesi, iki yönlü metin panosu ve güç işlemleri.
 
-En üst şerit iki eşit alandır: solda kaydırılabilir site/makro kısayolları, sağda yalnızca sekme simgeleri. Sağdaki simgelere dokunmak sekmeler arasında geçiş yapar; basılı tutmak **Sekmeyi kapat** seçeneğini açar. Sekme listesi Tarayıcı panelinin başındadır; yenileme ve kopyalama ayrı satırdadır. Simgeler açık sekmenin favicon bilgisi veya sitenin bildirdiği internet simgesi üzerinden alınır; bulunamazsa yedek simge gösterilir. URL içermeyen makrolara kendi sembolünü verebilirsin.
+En üst şerit iki eşit alandır: solda kaydırılabilir site/makro kısayolları, sağda yalnızca sekme simgeleri. Sağdaki simgelere dokunmak sekmeler arasında geçiş yapar; basılı tutmak **Sekmeyi kapat** seçeneğini açar. Android’de bu menü yerel uygulama penceresinde açılır. Sekme listesi Tarayıcı panelinin başındadır; yenileme ve kopyalama ayrı satırdadır. Simgeler açık sekmenin favicon bilgisi veya sitenin bildirdiği internet simgesi üzerinden alınır; bulunamazsa yedek simge gösterilir. URL içermeyen makrolara kendi sembolünü verebilirsin.
 
 ## Tarayıcı sekmelerini listeleme
 
@@ -69,7 +69,7 @@ Windows’ta Chrome veya Edge için:
 2. `chrome://extensions` veya `edge://extensions` sayfasını aç, Geliştirici modunu etkinleştir.
 3. **Paketlenmemiş öğe yükle** ile çıkarttığın klasörü seç.
 
-Yeni sürümde eklenti HTTP/HTTPS sayfalardaki yazı alanı odağını da algılar. Mevcut eklenti klasörünü yeni ZIP içeriğiyle değiştir, uzantılar sayfasından yeniden yükle ve açık siteleri yenile. Android uygulaması ön plandayken PC’de yazı alanına girildiğinde telefon klavyesi açılır; yalnızca odak bilgisi paylaşılır, alan içeriği okunmaz. Yerel Windows programları standart Windows yazı imlecini gösterdiğinde de algılanır. Özel çizilmiş alanlar, tarayıcının korumalı sayfaları ve adres çubuğu her zaman algılanamayabilir. iPhone/tarayıcı güvenlik kısıtları nedeniyle klavye alanına elle dokunmak gerekebilir.
+Yeni sürümde eklenti HTTP/HTTPS sayfalardaki yazı alanı odağını da algılar. Mevcut eklenti klasörünü yeni ZIP içeriğiyle değiştir, uzantılar sayfasından yeniden yükle ve açık siteleri yenile. Android uygulaması ön plandayken PC’de yazı alanına girildiğinde telefon klavyesi açılır; yalnızca odak bilgisi paylaşılır, alan içeriği okunmaz. Windows yazı alanları UI Automation erişilebilirlik odağı ve standart yazı imleciyle algılanır. Android, otomatik klavyeyi yerel yazı giriş alanıyla açar; Türkçe karakterler, emoji, silme ve Enter anlık gönderilir. Salt okunur alanlar UI Automation üzerinden ayırt edilir. Özel çizilmiş alanlar, tarayıcının korumalı sayfaları ve adres çubuğu her zaman algılanamayabilir. iPhone/tarayıcı güvenlik kısıtları nedeniyle klavye alanına elle dokunmak gerekebilir.
 
 Eklenti yalnızca aynı bilgisayardaki Sofa Remote sunucusuna bağlanır. Telefonun Tarayıcı panelindeki **Yenile** düğmesi açık sekmeleri getirir. Sekme adları ve adresleri ev ağındaki bağlı kumandaya gösterilir. Eklentisiz temel tarayıcı kısayolları kullanılabilir.
 

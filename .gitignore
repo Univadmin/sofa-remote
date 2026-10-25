@@ -11,3 +11,6 @@ build/
 *.p12
 *.jks
 *.keystore
+android-interaction-screenshots/
+android-interaction-logcat.txt
+android-interaction-server.log

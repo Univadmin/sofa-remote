@@ -31,6 +31,11 @@ public class RemoteInteractionTest {
         try{waitFor(()->"true".equals(js("typeof ws!=='undefined'&&ws.readyState===1")));}catch(AssertionError error){throw new AssertionError(js("JSON.stringify({url:location.href,text:document.body?.innerText,ws:typeof ws==='undefined'?'none':ws?.readyState})"),error);}
         js("window.testSent=[];window.testOriginalSend=WebSocket.prototype.send;WebSocket.prototype.send=function(value){testSent.push(JSON.parse(value));return testOriginalSend.call(this,value)};true");
     }
+    private void screenshot(String name)throws Exception{
+        android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
+        if(bitmap!=null){java.io.File path=new java.io.File(rule.getActivity().getExternalFilesDir(null),name+".png");try(java.io.FileOutputStream output=new java.io.FileOutputStream(path)){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,output);}}
+    }
+    @After public void captureResult()throws Exception{screenshot("interaction-"+SystemClock.uptimeMillis());}
     private void hold(String selector)throws Exception{
         JSONArray point=new JSONArray(js("(()=>{const r=document.querySelector("+org.json.JSONObject.quote(selector)+").getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2]})()"));
         int[] origin=new int[2];float[] scale=new float[1];InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{web.getLocationOnScreen(origin);scale[0]=web.getScale();});
@@ -49,14 +54,14 @@ public class RemoteInteractionTest {
     }
     @Test public void topTabLongPressOffersAndClosesTab()throws Exception{
         waitFor(()->"1".equals(js("document.querySelectorAll('#top-tabs button').length")));
-        hold("#top-tabs button");onView(withText("Sekmeyi kapat")).perform(click());
+        hold("#top-tabs button");screenshot("tab-close-menu");onView(withText("Sekmeyi kapat")).perform(click());
         waitFor(()->"0".equals(js("document.querySelectorAll('#top-tabs button').length")));
         assertEquals("true",js("testSent.some(x=>x.type==='tab'&&x.action==='close'&&x.tabId===101)"));
     }
     @Test public void pcFocusOpensNativeKeyboardAndSendsText()throws Exception{
         js("fetch('/__focus',{method:'POST'});true");
         waitFor(()->{boolean[] ready=new boolean[1];InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{View focus=rule.getActivity().getCurrentFocus();ready[0]=focus instanceof EditText&&focus.getRootWindowInsets()!=null&&focus.getRootWindowInsets().isVisible(WindowInsets.Type.ime());});return ready[0];});
-        onView(withHint("PC’ye yaz…")).perform(typeText("abc"));
+        screenshot("native-keyboard");onView(withHint("PC’ye yaz…")).perform(typeText("abc"));
         waitFor(()->"\"abc\"".equals(js("testSent.filter(x=>x.type==='edit').map(x=>x.text).join('')")));
     }
 }
