@@ -101,15 +101,15 @@ function setupFullMouse(){
  globalMouse=new DoubleTapMouse(gestureOptions());let suppressUntil=0,pendingClick=null,replaying=false;const owners=new Map();
  const clearPending=()=>{if(pendingClick)clearTimeout(pendingClick.timer);pendingClick=null};
  const replayPending=()=>{const p=pendingClick;clearPending();if(p){replaying=true;p.target.click();replaying=false}};
- const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.touchpad,.topbar,input,textarea,select,[contenteditable=true]');
+ const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.touchpad,input,textarea,select,[contenteditable=true]');
  document.addEventListener('pointerdown',e=>{
-  if(!allowed(e))return;const scroll=e.target.closest('.pane-content');owners.set(e.pointerId,scroll);
+  if(!allowed(e))return;const scroll=e.target.closest('.favorites,.tabstrip,.pane-content');owners.set(e.pointerId,scroll);
   if(globalMouse.down(e)){clearPending();suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
  },{capture:true,passive:false});
  document.addEventListener('pointermove',e=>{
   if(!owners.has(e.pointerId))return;const result=globalMouse.move(e);if(!result)return;
   if(result.active){suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
-  else if(result.moved){const scroll=owners.get(e.pointerId);if(scroll)scroll.scrollTop-=result.dy;}
+  else if(result.moved){const scroll=owners.get(e.pointerId);if(scroll){if(scroll.matches('.favorites,.tabstrip'))scroll.scrollLeft-=result.dx;else scroll.scrollTop-=result.dy;}}
  },{capture:true,passive:false});
  document.addEventListener('pointerup',e=>{
   if(!owners.delete(e.pointerId))return;const result=globalMouse.up(e);
