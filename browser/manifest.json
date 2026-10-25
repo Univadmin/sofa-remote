@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Sofa Remote Tabs",
-  "version": "0.4.2",
-  "description": "Yerel Sofa Remote kumandas\u0131ndan taray\u0131c\u0131 sekmelerini y\u00f6netin.",
+  "version": "0.4.3",
+  "description": "Yerel Sofa Remote kumandasından tarayıcı sekmelerini yönetin.",
   "permissions": [
     "tabs",
     "alarms"
@@ -25,7 +25,23 @@
         "movie-player.js"
       ],
       "all_frames": true,
-      "match_about_blank": true
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "movie-bridge.js"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "match_origin_as_fallback": true,
+      "world": "MAIN",
+      "run_at": "document_start"
     }
   ]
 }

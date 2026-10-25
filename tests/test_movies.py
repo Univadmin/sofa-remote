@@ -46,6 +46,9 @@ class MovieTests(unittest.IsolatedAsyncioTestCase):
     async def test_offline_catalog_uses_saved_movies(self):
         await self.populate();self.movies.cache.clear();self.movies.query=AsyncMock(side_effect=OSError('offline'))
         result=await self.movies.search('Esaret');self.assertTrue(result['offline']);self.assertEqual(len(result['movies']),1)
+    def test_javascript_created_player_is_a_candidate_not_subtitle_proof(self):
+        page=FilmPage();page.feed('<h1>Movie</h1><div id="player"></div><script>jwplayer("player").setup({});</script>')
+        self.assertTrue(page.player);self.assertFalse(page.turkish)
     def test_public_urls_only_and_subtitle_claims_are_not_inferred_from_page_text(self):
         for url in ('http://example.com','https://127.0.0.1/movie','https://192.168.1.1','https://localhost/','https://host.local/','https://user:pass@example.com'):
             with self.assertRaises(ValueError):public_url(url)
@@ -81,7 +84,7 @@ class MovieApiTests(unittest.IsolatedAsyncioTestCase):
     async def test_only_authorized_playback_can_request_one_trusted_key(self):
         import asyncio
         await self.client.post('/api/connect');browser=await self.client.ws_connect('/api/browser')
-        await browser.send_json({'type':'movie-capabilities','version':1});await asyncio.sleep(.01)
+        await browser.send_json({'type':'movie-capabilities','version':2});await asyncio.sleep(.01)
         remote=self.app['remote'];task=asyncio.create_task(remote.playback.command('movie-play',url='https://example.com/movie',movie=NODE['content']))
         command=await browser.receive_json()
         for ident in ('unrelated',command['requestId'],command['requestId']):await browser.send_json({'type':'movie-gesture','requestId':ident})

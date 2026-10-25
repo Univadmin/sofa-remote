@@ -27,7 +27,7 @@ class Playback:
         r=self.remote
         if r.browser is None or not r.movie_capable:raise ValueError('Oynatıcı kontrolü için PC tarayıcı eklentisini güncelleyin ve bağlayın')
         ident=secrets.token_hex(12);future=asyncio.get_running_loop().create_future();r.browser_pending[ident]=future
-        if kind=='movie-play':self.gestures.add(ident)
+        if kind in ('movie-play','movie-probe'):self.gestures.add(ident)
         try:
             await r.browser.send_json({'type':kind,'requestId':ident,**data})
             result=await asyncio.wait_for(future,26)
@@ -45,7 +45,7 @@ class Playback:
         if not self.remote.movie_capable or self.remote.browser is None:return {'movie':movie,'state':'extension_required','offers':[],'message':'İzlenebilirliği kontrol etmek için PC tarayıcı eklentisini güncelleyin. Platform hesabına PC tarayıcısında giriş yapılmış olmalı.'}
         job=self.jobs.get(ident)
         if job and (job['state']=='checking' or not force and time.time()-job['checked']<600):return {**job,'offers':list(job['offers'])}
-        job={'movie':movie,'state':'checking','offers':[],'checked':time.time(),'attempted':0,'failures':[],'message':'Kaynaklar PC tarayıcısında sessizce deneniyor…'};self.jobs[ident]=job
+        job={'movie':movie,'state':'checking','offers':[],'checked':time.time(),'attempted':0,'failures':[],'message':'Kaynaklar PC tarayıcısında deneniyor; gerekirse oynatıcı sekmesi kısa süre öne alınır…'};self.jobs[ident]=job
         task=asyncio.create_task(self.check(ident,job));self.workers[ident]=task
         return {**job,'offers':[]}
     async def check(self,ident,job):
@@ -63,7 +63,7 @@ class Playback:
                 if type(runtime) in (int,float) and runtime>0 and not runtime*45<=duration<=runtime*78:return
                 job['offers'].append({**offer,'url':url,'source_id':secrets.token_urlsafe(12),'verified':True,'turkish_subtitles':bool(proof.get('turkish_subtitles')),'checked':time.time()})
             except (ValueError,TimeoutError,OSError) as error:
-                job['failures'].append(str(error)[:180] or 'Oynatıcı zamanında yanıt vermedi')
+                job['failures'].append((str(offer.get('provider') or urlsplit(url).hostname)+': '+(str(error) or 'Oynatıcı zamanında yanıt vermedi'))[:240])
             finally:
                 job['attempted']+=1
                 job['message']=f"{job['attempted']} kaynak kontrol edildi; arama en fazla {SCAN_TIMEOUT} saniye sürer."

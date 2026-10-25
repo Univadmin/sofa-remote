@@ -28,10 +28,12 @@ class SearchLinks(HTMLParser):
 
 class FilmPage(HTMLParser):
     def __init__(self):super().__init__();self.text=[];self.turkish=False;self.player=False
-    def handle_data(self,data):self.text.append(data)
+    def handle_data(self,data):
+        self.text.append(data)
+        if re.search(r'\b(?:jwplayer|videojs)\s*\(|\"@type\"\s*:\s*\"VideoObject\"',data):self.player=True
     def handle_starttag(self,tag,attrs):
         a=dict(attrs)
-        if tag in ('video','iframe'):self.player=True
+        if tag in ('video','iframe') or re.search(r'(?:^|[\s_-])(?:jwplayer|video-js|plyr|player|videoplayer)(?:$|[\s_-])',a.get('class','')+' '+a.get('id',''),re.I):self.player=True
         if tag=='track' and a.get('srclang','').lower().split('-')[0] in ('tr','tur') and a.get('kind','subtitles') in ('subtitles','captions') and a.get('src'):self.turkish=True
         if tag=='meta' and a.get('property')=='og:title':self.text.append(a.get('content',''))
 
@@ -196,18 +198,19 @@ class Movies:
         async with ClientSession(connector=TCPConnector(resolver=PublicResolver()),timeout=ClientTimeout(total=5,connect=2),headers={'User-Agent':'Mozilla/5.0 SofaRemote movie discovery'}) as client:
             try:
                 html,_=await self.public_html(client,'https://html.duckduckgo.com/html/?q='+quote_plus(query))
-                parser=SearchLinks();parser.feed(html);urls=list(dict.fromkeys(parser.urls))[:5]
+                parser=SearchLinks();parser.feed(html);urls=list(dict.fromkeys(parser.urls))[:12]
             except Exception:urls=[]
+            slots=asyncio.Semaphore(4)
             async def inspect(url):
                 try:
-                    html,final=await self.public_html(client,url);page=FilmPage();page.feed(html)
+                    async with slots:html,final=await self.public_html(client,url);page=FilmPage();page.feed(html)
                     title=normalized(' '.join(page.text));matched=any(len(n)>=4 and n in title for n in (normalized(movie['title']),normalized(movie['original_title'])))
                     from .playback import video_candidate
                     if not matched or not page.player or not video_candidate(final):return None
                     return {'url':final,'provider':urlsplit(final).hostname,'cost':'Site koşulları bilinmiyor','kind':'UNKNOWN',
                         'turkish_subtitles':page.turkish and page.player,'unverified':True,'languages_known':page.turkish}
                 except Exception:return None
-            offers=[o for o in await asyncio.gather(*(inspect(url) for url in urls)) if o]
+            offers=[o for o in await asyncio.gather(*(inspect(url) for url in urls)) if o][:5]
         result={'offers':offers,'search_url':self.web_search(ident)};self.cache[key]=(time.time()+600,result)
         return result
     def web_search(self,ident):

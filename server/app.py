@@ -220,7 +220,7 @@ async def browser_handler(request):
             try:
                 data=json.loads(msg.data)
                 if data.get('type')=='movie-capabilities':
-                    r.movie_capable=data.get('version')==1
+                    r.movie_capable=data.get('version')==2
                 elif data.get('type')=='movie-gesture':
                     ident=data.get('requestId')
                     if ident in r.playback.gestures:
