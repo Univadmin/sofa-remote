@@ -22,3 +22,10 @@ chrome.tabs.onActivated.addListener(publish);chrome.tabs.onUpdated.addListener(p
 chrome.alarms.create('sofa-reconnect',{periodInMinutes:0.5});chrome.alarms.onAlarm.addListener(connect);
 setInterval(()=>{if(socket?.readyState===1){socket.send(JSON.stringify({type:'heartbeat'}));publish()}else connect()},20000);
 connect();
+
+chrome.runtime.onMessage.addListener((message,sender)=>{
+ if(message.type!=='keyboard-focus'||typeof message.active!=='boolean'||!sender.tab)return;
+ chrome.tabs.get(sender.tab.id).then(tab=>chrome.windows.get(tab.windowId).then(win=>{
+  if(tab.active&&win.focused&&socket?.readyState===1)socket.send(JSON.stringify({type:'keyboard-focus',active:message.active,tabId:tab.id}));
+ })).catch(()=>{});
+});

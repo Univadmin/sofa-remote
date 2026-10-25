@@ -62,6 +62,8 @@ public class MainActivity extends Activity {
         setContentView(web);web.loadUrl(server);
     }
     private class NativeBridge {
+        @JavascriptInterface public void showKeyboard(){whenActive(()->{if(web!=null){web.requestFocus();web.postDelayed(()->{if(web!=null&&!paused){android.view.inputmethod.InputMethodManager ime=(android.view.inputmethod.InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);ime.showSoftInput(web,0);}},120);}});}
+        @JavascriptInterface public void vibrate(){whenActive(()->{if(web!=null)web.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);});}
         @JavascriptInterface public void discover(){runOnUiThread(()->showDevices());}
         @JavascriptInterface public void connectionReady(){runOnUiThread(()->{failures=0;updater.publish();});}
         @JavascriptInterface public void checkUpdates(){updater.checkFromUser();}

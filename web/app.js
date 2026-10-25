@@ -2,7 +2,7 @@
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const labels={mouse:'⌖ Mouse',media:'▶ Medya',keyboard:'⌨ Klavye',browser:'▣ Tarayıcı / Sekmeler',apps:'▦ Uygulamalar',commands:'☷ Tüm butonlar',tools:'⚙ Araçlar',downloads:'↻ Güncelleme'};
 const storage={get:(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}},set:(key,value)=>localStorage.setItem(key,JSON.stringify(value))};
-let paneTypes=storage.get('panes',['mouse','media']), shortcuts=[],ws,stopped=false,retry,sequence=0,pending=new Map(),toastTimer,tabsState={tabs:[],connected:false},tabsFingerprint='',fullMouse=storage.get('fullMouse',false),globalMouse=null,checkingUpdates=false,pcPrompted='';
+let paneTypes=storage.get('panes',['mouse','media']), shortcuts=[],ws,stopped=false,retry,sequence=0,pending=new Map(),toastTimer,tabsState={tabs:[],connected:false},tabsFingerprint='',fullMouse=storage.get('fullMouse',false),globalMouse=null,checkingUpdates=false,pcPrompted='',restartUntil=0;
 const escaped=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const actionButton=(label,action,cls='')=>`<button class="${cls}" data-action="${escaped(JSON.stringify(action))}">${escaped(label)}</button>`;
 const keyButton=(label,keys)=>actionButton(label,{type:'keys',keys});
@@ -26,18 +26,18 @@ function connect(){
   clearTimeout(retry);if(stopped)return;if(ws?.readyState===0||ws?.readyState===1)return;
   ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/api/ws`);
   ws.onopen=()=>{status('Bağlı',true);resetLive();window.SofaNative?.connectionReady();refreshGlobalTabs()};
-  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
+  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='server-restarting'){restartUntil=Date.now()+120000;status('Bilgisayar güncelleniyor…');return}if(d.type==='keyboard-focus'){if(d.active)openPhoneKeyboard();return}if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
   ws.onclose=()=>{for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('Bağlantı kesildi'))}pending.clear();resetLive();status(stopped?'Bağlantı kesildi':'Tekrar bağlanıyor');if(!stopped)retry=setTimeout(load,2000)};
   ws.onerror=()=>status('Bilgisayar aranıyor');
 }
 let failures=0;
-async function load(){if(stopped)return;try{await api('connect',{method:'POST'});shortcuts=await api('shortcuts');renderFavorites();connect();failures=0}catch{failures++;status('Bilgisayara ulaşılamıyor');if(failures===3)window.SofaNative?.discover();retry=setTimeout(load,2500)}}
+async function load(){if(stopped)return;try{await api('connect',{method:'POST'});shortcuts=await api('shortcuts');renderFavorites();connect();failures=0}catch{failures++;status('Bilgisayara ulaşılamıyor');if(failures>=30&&Date.now()>restartUntil)window.SofaNative?.discover();retry=setTimeout(load,2500)}}
 function release(){send({type:'release'});resetLive()}
 window.addEventListener('sofa-pause',release);document.addEventListener('visibilitychange',()=>{if(document.hidden)release();else if(!stopped&&ws?.readyState!==1)load()});
 window.addEventListener('sofa-volume',e=>send({type:'keys',keys:[e.detail>0?'VOLUMEUP':'VOLUMEDOWN']}));
 $('#connection').onclick=()=>{stopped=false;load()};
 const keyCommands={'Geri':['ALT','LEFT'],'İleri':['ALT','RIGHT'],'Yenile':['CTRL','R'],'Adres çubuğu':['CTRL','L'],'Yeni sekme':['CTRL','T'],'Sekmeyi kapat':['CTRL','W'],'Sonraki sekme':['CTRL','TAB'],'Önceki sekme':['CTRL','SHIFT','TAB'],'Sekmeyi geri aç':['CTRL','SHIFT','T'],'Tam ekran (F11)':['F11'],'Pencere değiştir':['ALT','TAB'],'Masaüstü':['WIN','D'],'Başlat':['WIN'],'Ses artır':['VOLUMEUP'],'Ses azalt':['VOLUMEDOWN'],'Sessiz':['MUTE'],'Oynat/duraklat':['PLAYPAUSE'],'Durdur':['STOP'],'Önceki medya':['PREVIOUS'],'Sonraki medya':['NEXT'],'Sunum başlat':['F5'],'Sunum önceki':['PAGEUP'],'Sunum sonraki':['PAGEDOWN'],'Sunumu karart':['B']};
-const special=['ESC','TAB','ENTER','BACKSPACE','SPACE','DELETE','HOME','END','PAGEUP','PAGEDOWN','INSERT','PRINTSCREEN','LEFT','UP','DOWN','RIGHT',...Array.from({length:12},(_,i)=>'F'+(i+1)),...Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789')];
+const special=['ESC','TAB','ENTER','BACKSPACE','SPACE','DELETE','HOME','END','PAGEUP','PAGEDOWN','INSERT','PRINTSCREEN','LEFT','UP','DOWN','RIGHT',...Array.from({length:12},(_,i)=>'F'+(i+1))];
 const catalog=[...Object.entries(keyCommands).map(([name,keys])=>({name,action:{type:'keys',keys}})),...special.map(key=>({name:'Klavye · '+key,action:{type:'keys',keys:[key]}})),...['left','middle','right'].map(button=>({name:'Mouse · '+({left:'Sol',middle:'Orta',right:'Sağ'}[button])+' tık',action:{type:'click',button}})),...['youtube','netflix','generic'].flatMap(profile=>['play','back','forward','fullscreen','captions'].map(action=>({name:profile+' · '+({play:'Oynat/duraklat',back:'Geri sar',forward:'İleri sar',fullscreen:'Tam ekran',captions:'Altyazı'}[action]),action:{type:'profile',profile,action}}))),...Object.entries({chrome:'Chrome',edge:'Edge',firefox:'Firefox',explorer:'Dosya Gezgini',calculator:'Hesap Makinesi'}).map(([app,name])=>({name:'Uygulama · '+name,action:{type:'launch',app}})),...['lock','shutdown','restart','cancel'].map(action=>({name:'Güç · '+({lock:'Kilitle',shutdown:'Kapat',restart:'Yeniden başlat',cancel:'Kapatmayı iptal et'}[action]),action:{type:'power',action,confirm:true}}))];
 function mouseMarkup(){return `<div class="touchpad" role="application" aria-label="Mouse yüzeyi"><span>⌖<br>Çift dokun + basılı tut: sürükle<br>İki parmak: kaydır / sağ tık</span></div><div class="grid three mouse-buttons">${['left','middle','right'].map((button,i)=>actionButton(['Sol tık','Orta','Sağ tık'][i],{type:'click',button})).join('')}</div><div class="row mouse-options"><label><input type="checkbox" data-drag> Sürükle</label><label>Hız <input type="range" data-speed min="0.5" max="4" step="0.1" value="${storage.get('speed',1.6)}"></label><label><input type="checkbox" data-lefty ${storage.get('lefty',false)?'checked':''}> Solak</label></div>`}
 function mediaMarkup(){return `<div class="row"><select data-profile aria-label="Video sitesi"><option value="generic">Genel</option><option value="youtube">YouTube</option><option value="netflix">Netflix</option></select><small class="hint">Video odakta olmalı</small></div><div class="transport"><button data-video="back">⏪</button><button data-video="play" class="primary">▶ / Ⅱ</button><button data-video="forward">⏩</button></div><div class="grid three">${keyButton('Ses −',['VOLUMEDOWN'])}${keyButton('Sessiz',['MUTE'])}${keyButton('Ses +',['VOLUMEUP'])}<button data-video="fullscreen">⛶ Ekran</button><button data-video="captions">Altyazı</button>${keyButton('■ Durdur',['STOP'])}</div><div class="grid three">${keyButton('⏮',['PREVIOUS'])}${keyButton('Sistem ▶/Ⅱ',['PLAYPAUSE'])}${keyButton('⏭',['NEXT'])}</div>`}
@@ -98,13 +98,11 @@ function setupMouse(root){
  root.querySelector('[data-speed]').onchange=e=>storage.set('speed',Number(e.target.value));root.querySelector('[data-lefty]').onchange=e=>storage.set('lefty',e.target.checked);
 }
 function setupFullMouse(){
- globalMouse=new DoubleTapMouse(gestureOptions());let suppressUntil=0,pendingClick=null,replaying=false;const owners=new Map();
- const clearPending=()=>{if(pendingClick)clearTimeout(pendingClick.timer);pendingClick=null};
- const replayPending=()=>{const p=pendingClick;clearPending();if(p){replaying=true;p.target.click();replaying=false}};
- const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.touchpad,input,textarea,select,[contenteditable=true]');
+ globalMouse=new HoldMouse(gestureOptions({delay:(f,ms)=>setTimeout(f,ms),cancelDelay:id=>clearTimeout(id),activate:()=>{suppressUntil=performance.now()+700;window.SofaNative?.vibrate?.()}}));let suppressUntil=0;const owners=new Map();
+ const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.touchpad,#top-tabs,input,textarea,select,[contenteditable=true]');
  document.addEventListener('pointerdown',e=>{
   if(!allowed(e))return;const scroll=e.target.closest('.favorites,.tabstrip,.pane-content');owners.set(e.pointerId,scroll);
-  if(globalMouse.down(e)){clearPending();suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
+  if(globalMouse.down(e)){suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
  },{capture:true,passive:false});
  document.addEventListener('pointermove',e=>{
   if(!owners.has(e.pointerId))return;const result=globalMouse.move(e);if(!result)return;
@@ -116,13 +114,8 @@ function setupFullMouse(){
   if(result?.active||result?.moved){suppressUntil=performance.now()+700;if(e.cancelable)e.preventDefault()}
  },{capture:true,passive:false});
  document.addEventListener('pointercancel',e=>{if(owners.has(e.pointerId)){owners.clear();globalMouse.reset()}},true);
- document.addEventListener('click',e=>{
-  if(!fullMouse||replaying||$('#sheet').open)return;
-  if(performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation();return}
-  const target=e.target.closest('button,a,summary');if(!target||!allowed(e))return;
-  e.preventDefault();e.stopImmediatePropagation();if(pendingClick)replayPending();
-  pendingClick={target,timer:setTimeout(replayPending,350)};
- },true);
+ document.addEventListener('contextmenu',e=>{if(allowed(e)){e.preventDefault();e.stopImmediatePropagation()}},true);
+ document.addEventListener('click',e=>{if(fullMouse&&!$('#sheet').open&&performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation()}},true);
  document.body.classList.toggle('full-mouse',fullMouse);
 }
 
@@ -139,7 +132,16 @@ function iconElement(item){const span=document.createElement('span'),url=item.ta
 async function refreshGlobalTabs(){if(ws?.readyState!==1)return;try{applyTabs(await send({type:'tabs'},true))}catch{}}
 function applyTabs(result){const fingerprint=JSON.stringify([result.connected,result.tabs]);tabsState={tabs:result.tabs||[],connected:!!result.connected};if(fingerprint===tabsFingerprint)return;tabsFingerprint=fingerprint;renderTopTabs();renderFavorites();for(const root of $$('.controller'))if(root.querySelector('[data-tabs]'))renderTabsList(root)}
 function renderTopTabs(){const strip=$('#top-tabs');strip.replaceChildren();if(!tabsState.tabs.length){const empty=document.createElement('span');empty.className='empty-tabs';empty.textContent='▣';empty.title='Açık tarayıcı sekmesi yok';strip.append(empty);return}
- for(const tab of tabsState.tabs){const b=document.createElement('button');b.className=tab.active?'active':'';b.setAttribute('aria-label',tab.title||'Sekmeye geç');b.setAttribute('aria-pressed',String(tab.active));b.title=tab.title||tab.url;b.append(iconElement({tab,icon:'🌐'}));b.onclick=()=>run({type:'tab',action:'activate',tabId:tab.id}).catch(e=>toast(e.message));strip.append(b)}
+ for(const tab of tabsState.tabs){const b=document.createElement('button');b.className=tab.active?'active':'';b.setAttribute('aria-label',tab.title||'Sekmeye geç');b.setAttribute('aria-pressed',String(tab.active));b.title=tab.title||tab.url;b.append(iconElement({tab,icon:'🌐'}));b.onclick=()=>{if(!b._held)run({type:'tab',action:'activate',tabId:tab.id}).catch(e=>toast(e.message))};setupTabHold(b,tab);strip.append(b)}
+}
+
+function setupTabHold(button,tab){
+ let timer,start;
+ const cancel=()=>{clearTimeout(timer);timer=null};
+ button.addEventListener('pointerdown',e=>{button._held=false;start={x:e.clientX,y:e.clientY};timer=setTimeout(()=>{button._held=true;sheet('Sekme',`<p>${escaped(tab.title||tab.url||'Sekme')}</p><button id="close-top-tab" class="wide">Sekmeyi kapat</button>`);$('#close-top-tab').onclick=async()=>{try{await run({type:'tab',action:'close',tabId:tab.id});$('#sheet').close();await refreshGlobalTabs()}catch(e){toast(e.message)}}},550)});
+ button.addEventListener('pointermove',e=>{if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>10)cancel()});
+ for(const name of ['pointerup','pointercancel','pointerleave'])button.addEventListener(name,cancel);
+ button.addEventListener('contextmenu',e=>e.preventDefault());
 }
 
 function renderFavorites(){$('#favorites').replaceChildren();shortcuts.forEach((item,index)=>{const b=document.createElement('button');b.title=item.name;b.setAttribute('aria-label',item.name);b.append(iconElement(item));b.onclick=async()=>{try{await send({type:'macro',index},true)}catch(e){toast(e.message)}};$('#favorites').append(b)})}
@@ -159,14 +161,14 @@ function renderTabsList(root){
 async function refreshApps(root){const {windows}=await send({type:'windows'},true),list=root.querySelector('[data-windows]');list.replaceChildren();for(const w of windows){const row=document.createElement('div');row.className='list-item';const title=document.createElement('button');title.textContent=w.title;title.className='title';title.onclick=()=>run({type:'focus',id:w.id}).catch(e=>toast(e.message));row.append(title);const actions=document.createElement('div');actions.className='grid four';for(const [action,name] of [['minimize','Küçült'],['maximize','Büyüt'],['restore','Geri al'],['close','Kapat']]){const b=document.createElement('button');b.className='small';b.textContent=name;b.onclick=async()=>{if(action==='close'&&!confirm(w.title+' kapatılsın mı?'))return;try{await run({type:'window',handle:w.id,action});await refreshApps(root)}catch(e){toast(e.message)}};actions.append(b)}row.append(actions);list.append(row)}}
 function sheet(title,html){release();$('#sheet-title').textContent=title;$('#sheet-body').innerHTML=html;$('#sheet').showModal()}
 $('#close-sheet').onclick=()=>$('#sheet').close();$('#sheet').addEventListener('click',e=>{if(e.target===$('#sheet'))$('#sheet').close()});
-$('#layout').onclick=()=>{sheet('Ekran ve mouse','<label class="setting-switch"><input type="checkbox" id="full-mouse-setting" '+(fullMouse?'checked':'')+'> Bütün ekranı mouse olarak kullan</label><p class="hint">Çift dokun; ikinci dokunuşu bırakmadan kaydır: mouse hareket eder. Parmağını kaldırınca sol tık yapılır. Tek dokunuş uygulamayı normal kullanır. Normal mouse yüzeyi her zaman çalışır.</p><p class="hint">Normal mouse: çift dokun, ikinci dokunuşu basılı tutup kaydırarak sürükle.</p><div class="grid"><button id="stack">▤ Üst üste</button><button id="side">▥ Yan yana</button></div>');$('#full-mouse-setting').onchange=e=>{release();fullMouse=e.target.checked;storage.set('fullMouse',fullMouse);document.body.classList.toggle('full-mouse',fullMouse);toast(fullMouse?'Tam ekran mouse açık':'Normal mouse açık')};$('#stack').onclick=()=>setLayout(false);$('#side').onclick=()=>setLayout(true)};
+$('#layout').onclick=()=>{sheet('Ekran ve mouse','<label class="setting-switch"><input type="checkbox" id="full-mouse-setting" '+(fullMouse?'checked':'')+'> Bütün ekranı mouse olarak kullan</label><p class="hint">Yarım saniye basılı tut, ardından kaydır: mouse hareket eder. Parmağını kaldırınca sol tık yapılır. Tek dokunuş uygulamayı normal kullanır. Normal mouse yüzeyi her zaman çalışır.</p><p class="hint">Normal mouse: çift dokun, ikinci dokunuşu basılı tutup kaydırarak sürükle.</p><div class="grid"><button id="stack">▤ Üst üste</button><button id="side">▥ Yan yana</button></div>');$('#full-mouse-setting').onchange=e=>{release();fullMouse=e.target.checked;storage.set('fullMouse',fullMouse);document.body.classList.toggle('full-mouse',fullMouse);toast(fullMouse?'Tam ekran mouse açık':'Normal mouse açık')};$('#stack').onclick=()=>setLayout(false);$('#side').onclick=()=>setLayout(true)};
 function setLayout(side){$('#workspace').classList.toggle('side',side);storage.set('side',side);$('#sheet').close()}
 $('#shortcuts').onclick=()=>{sheet('Kısayollar ve makrolar','<input id="shortcut-name" placeholder="Kısayol adı" aria-label="Kısayol adı"><input id="shortcut-url" placeholder="https://…" type="url" aria-label="Site adresi"><input id="shortcut-icon" placeholder="Makro sembolü (ör. 🎬)" maxlength="12"><button id="add-shortcut" class="primary wide">Site ekle</button><div id="shortcut-list"></div><details><summary>Makroları düzenle / yedekle</summary><textarea id="macro-json" aria-label="Makrolar"></textarea><button id="save-macros" class="wide">Kaydet</button></details>');$('#macro-json').value=JSON.stringify(shortcuts,null,2);const list=$('#shortcut-list');shortcuts.forEach((item,index)=>{const row=document.createElement('div');row.className='row list-item';const name=document.createElement('span');name.className='title';name.textContent=item.name;const del=document.createElement('button');del.textContent='Sil';del.onclick=async()=>{try{await save(shortcuts.filter((_,i)=>i!==index));$('#sheet').close()}catch(e){toast(e.message)}};row.append(iconElement(item),name,del);list.append(row)});$('#add-shortcut').onclick=async()=>{try{await save([...shortcuts,{name:$('#shortcut-name').value.trim(),icon:$('#shortcut-icon').value||'🌐',actions:[{type:'url',url:$('#shortcut-url').value.trim()}]}]);$('#sheet').close()}catch(e){toast(e.message)}};$('#save-macros').onclick=async()=>{try{await save(JSON.parse($('#macro-json').value));$('#sheet').close()}catch(e){toast(e.message)}}};
 function downloadsMarkup(){return `<div class="update-info" aria-live="polite"><p data-update-status>PC sürümü okunuyor…</p><p data-android-status></p></div><button class="primary wide" data-check-updates>Güncellemeleri kontrol et</button>`}
 function nativeUpdateInfo(){try{const raw=window.SofaNative?.updateInfo?.();if(raw)return JSON.parse(raw)}catch{}return storage.get('androidUpdate',null)}
 async function refreshDownloads(root){try{const d=await api('updates'),status=root.querySelector('[data-update-status]');if(!status)return;const state={idle:'Hazır',checking:'Kontrol ediliyor',current:'Güncel',available:'Yeni sürüm var',downloading:'İndiriliyor',ready:'Güncelleme hazır',error:'Kontrol yapılamadı'}[d.state]||d.state;status.textContent=`Windows v${d.current} · Son sürüm v${d.latest} · ${state}`;
  const native=nativeUpdateInfo(),android=root.querySelector('[data-android-status]');if(android)android.textContent=native?`Android${native.current?' v'+native.current:''}${native.latest?' · Son sürüm v'+native.latest:''} · ${native.message||''}`:window.SofaNative?'Android sürümü kontrol ediliyor…':'';
- if(checkingUpdates&&d.ready&&pcPrompted!==d.latest){pcPrompted=d.latest;if(confirm('Windows v'+d.latest+' indirildi. PC kumandası yeniden başlatılarak güncellensin mi?'))await api('updates/install',{method:'POST'})}
+ if(checkingUpdates&&d.ready&&pcPrompted!==d.latest){pcPrompted=d.latest;if(confirm('Windows v'+d.latest+' indirildi. PC kumandası yeniden başlatılarak güncellensin mi?')){restartUntil=Date.now()+120000;await api('updates/install',{method:'POST'})}}
  }catch(e){const status=root.querySelector('[data-update-status]');if(status)status.textContent=e.message}}
 async function checkUpdates(root){if(window.SofaNative&&!window.SofaNative.updateInfo&&/kurulmaya hazır/i.test(storage.get('androidUpdate',{}).message||'')){window.SofaNative.installUpdate();return}checkingUpdates=true;toast('Güncellemeler kontrol ediliyor…');const b=root.querySelector('[data-check-updates]');if(b)b.disabled=true;
  try{window.SofaNative?.checkUpdates();await api('updates/check',{method:'POST'});await refreshDownloads(root)}finally{if(b)b.disabled=false}}
@@ -178,3 +180,11 @@ $('#workspace').classList.toggle('side',storage.get('side',false));[0,1].forEach
 window.visualViewport?.addEventListener('resize',()=>document.documentElement.style.setProperty('--screen-height',window.visualViewport.height+'px'));
 setInterval(()=>{for(const root of $$('.controller, #sheet-body'))if(root.querySelector('[data-update-status]'))refreshDownloads(root)},1500);
 setInterval(()=>{if(!document.hidden)refreshGlobalTabs()},4000);
+
+function openPhoneKeyboard(){
+ if(document.hidden||$('#sheet').open)return;
+ let field=document.querySelector('.keyboard-live');
+ if(!field){paneTypes[1]='keyboard';storage.set('panes',paneTypes);renderPane(1);field=document.querySelector('#pane-1 .keyboard-live')}
+ field.focus({preventScroll:true});window.SofaNative?.showKeyboard?.();
+ if(!window.SofaNative)toast('Yazmak için klavye alanına dokun');
+}

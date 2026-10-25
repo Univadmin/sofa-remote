@@ -219,6 +219,8 @@ async def browser_handler(request):
                             tabs.append({'id':tab['id'],'windowId':tab['windowId'],'title':str(tab.get('title',''))[:200], 'url':str(tab.get('url',''))[:2048],'active':bool(tab.get('active')), 'favicon':safe_favicon(tab.get('favicon',tab.get('favIconUrl','')))})
                     r.browser_tabs=tabs
                     await r.publish_tabs()
+                elif data.get('type')=='keyboard-focus' and type(data.get('active')) is bool:
+                    await asyncio.gather(*(client.send_json({'type':'keyboard-focus','active':data['active']}) for client in list(r.sockets) if not client.closed),return_exceptions=True)
                 elif data.get('requestId') in r.browser_pending:
                     future=r.browser_pending[data['requestId']]
                     if not future.done(): future.set_result(data)
@@ -242,8 +244,10 @@ async def check_updates(request):
 
 async def install_update(request):
     r=request.app['remote']
-    try: r.updater.install()
+    try: await r.updater.install()
     except ValueError as exc: raise web.HTTPBadRequest(text=str(exc))
+    await asyncio.gather(*(client.send_json({'type':'server-restarting'}) for client in list(r.sockets) if not client.closed),return_exceptions=True)
+    r.adapter.release()
     asyncio.get_running_loop().call_later(1,lambda:os._exit(0))
     return web.json_response({'ok':True})
 
@@ -309,8 +313,13 @@ def create_app(adapter=None,state_dir=None):
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--host',default='0.0.0.0'); p.add_argument('--port',type=int,default=8765)
-    p.add_argument('--state-dir'); p.add_argument('--dry-run',action='store_true'); p.add_argument('--tls-cert'); p.add_argument('--tls-key')
-    args=p.parse_args(); app=create_app(DryRun() if args.dry_run else None,state_dir=args.state_dir)
+    p.add_argument('--install-startup',action='store_true'); p.add_argument('--disable-startup',action='store_true'); p.add_argument('--state-dir'); p.add_argument('--dry-run',action='store_true'); p.add_argument('--tls-cert'); p.add_argument('--tls-key')
+    args=p.parse_args()
+    if args.install_startup or args.disable_startup:
+        from .windows_runtime import configure_startup
+        configure_startup(args.install_startup, STATE); return
+    app=create_app(DryRun() if args.dry_run else None,state_dir=args.state_dir)
+    app['remote'].updater.health_url=f'http://127.0.0.1:{args.port}/api/info'
     import ssl
     context=None
     if args.tls_cert:
@@ -331,7 +340,20 @@ def main():
             if not context: discovery=await start_discovery(args.port)
         except OSError: print('Ağ keşfi başlatılamadı; telefon adresle bağlanabilir.')
         task=asyncio.create_task(app['remote'].updater.background()) if not args.dry_run else None
+        async def watch_focus():
+            previous=None
+            while True:
+                try:
+                    current=app['remote'].adapter.keyboard_focus()
+                    if current!=previous:
+                        previous=current
+                        await asyncio.gather(*(client.send_json({'type':'keyboard-focus','active':bool(current)}) for client in list(app['remote'].sockets) if not client.closed),return_exceptions=True)
+                except Exception: pass
+                await asyncio.sleep(.6)
+        focus_task=asyncio.create_task(watch_focus()) if not args.dry_run else None
         yield
+        if focus_task:
+            focus_task.cancel(); await asyncio.gather(focus_task,return_exceptions=True)
         if task:
             task.cancel()
             await asyncio.gather(task,return_exceptions=True)

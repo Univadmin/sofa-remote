@@ -52,6 +52,13 @@ class Windows:
         self.u.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
         self.u.SetForegroundWindow.argtypes = [wintypes.HWND]
         self.held = set()
+    def keyboard_focus(self):
+        class GUIINFO(ctypes.Structure):
+            _fields_=[('cbSize',wintypes.DWORD),('flags',wintypes.DWORD),
+                      *[(name,wintypes.HWND) for name in ('active','focus','capture','menu','move','caret')],('rect',wintypes.RECT)]
+        info=GUIINFO();info.cbSize=ctypes.sizeof(info)
+        if not self.u.GetGUIThreadInfo(0,ctypes.byref(info)):return None
+        return int(info.caret) if info.caret else None
     def move(self, x, y): self.u.mouse_event(1, x, y, 0, 0)
     def button(self, button, down):
         flags = {'left': (2,4), 'right': (8,16), 'middle': (32,64)}

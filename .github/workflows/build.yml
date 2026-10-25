@@ -65,6 +65,10 @@ jobs:
       - run: pip install -r requirements.txt pyinstaller
       - run: python -m unittest discover -s tests -v
       - run: pyinstaller --noconfirm --onefile --name SofaRemote --collect-all aiohttp --add-data "web;web" run.py
+      - run: pyinstaller --noconfirm --onefile --name UpdateFixture --paths . tests/windows_update_fixture.py
+      - run: python tests/windows_runtime_smoke.py
+        env:
+          PYTHONPATH: .
       - name: Verify packaged server
         shell: pwsh
         run: |
@@ -90,7 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cd browser && zip -r ../SofaRemote-Browser.zip manifest.json background.js
+      - run: cd browser && zip -r ../SofaRemote-Browser.zip manifest.json background.js focus.js
       - uses: actions/upload-artifact@v4
         with:
           name: Sofa-Remote-Browser

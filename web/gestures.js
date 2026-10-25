@@ -48,28 +48,23 @@ root.MouseGesture=MouseGesture;if(typeof module!=='undefined')module.exports={Mo
 })(typeof window==='undefined'?globalThis:window);
 (function(root){
 'use strict';
-class DoubleTapMouse {
- constructor(options){this.o=options;this.lastTap=null;this.gesture=null;this.frame=null;this.mx=0;this.my=0;this.active=false;}
- now(){return this.o.now?this.o.now():performance.now()}
+class HoldMouse {
+ constructor(options){this.o=options;this.gesture=null;this.frame=null;this.timer=null;this.mx=0;this.my=0;this.active=false;}
  down(e){
   if(this.gesture){this.reset();return false;}
-  const t=this.lastTap;this.active=!!(t&&this.now()-t.time<=350&&Math.hypot(e.clientX-t.x,e.clientY-t.y)<35);
-  this.gesture={id:e.pointerId,x:e.clientX,y:e.clientY,start:this.now(),distance:0};if(this.active)this.lastTap=null;return this.active;
+  this.gesture={id:e.pointerId,x:e.clientX,y:e.clientY,distance:0};
+  this.timer=this.o.delay(()=>{this.timer=null;if(this.gesture&&this.gesture.distance<=10){this.active=true;this.o.activate?.();}},500);return false;
  }
  move(e){
   const g=this.gesture;if(!g||g.id!==e.pointerId)return null;
   const dx=e.clientX-g.x,dy=e.clientY-g.y;g.x=e.clientX;g.y=e.clientY;g.distance+=Math.abs(dx)+Math.abs(dy);
+  if(!this.active&&g.distance>10&&this.timer!==null){this.o.cancelDelay(this.timer);this.timer=null;}
   if(this.active){const speed=this.o.speed?.()??1.6;this.mx+=dx*speed;this.my+=dy*speed;if(this.frame===null)this.frame=this.o.schedule(()=>{this.frame=null;this.flush()});}
   return {active:this.active,dx,dy,moved:g.distance>10};
  }
- flush(){if(this.frame!==null){this.o.cancelFrame(this.frame);this.frame=null;}const x=Math.max(-1000,Math.min(1000,Math.round(this.mx))),y=Math.max(-1000,Math.min(1000,Math.round(this.my)));if(x||y)this.o.move(x,y);this.mx=this.my=0;}
- up(e){
-  const g=this.gesture;if(!g||g.id!==e.pointerId)return null;this.move(e);const active=this.active,moved=g.distance>10;
-  if(active){this.flush();this.o.click('left');this.lastTap=null;}
-  else this.lastTap=!moved&&this.now()-g.start<350?{time:this.now(),x:e.clientX,y:e.clientY}:null;
-  this.gesture=null;this.active=false;return {active,moved};
- }
- reset(){if(this.frame!==null)this.o.cancelFrame(this.frame);this.frame=null;this.mx=this.my=0;this.active=false;this.lastTap=null;this.gesture=null;}
+ flush(){if(this.frame!==null)this.o.cancelFrame(this.frame);this.frame=null;const x=Math.max(-1000,Math.min(1000,Math.round(this.mx))),y=Math.max(-1000,Math.min(1000,Math.round(this.my)));if(x||y)this.o.move(x,y);this.mx=this.my=0;}
+ up(e){const g=this.gesture;if(!g||g.id!==e.pointerId)return null;this.move(e);const result={active:this.active,moved:g.distance>10};if(this.active){this.flush();this.o.click('left');}this.reset();return result;}
+ reset(){if(this.timer!==null)this.o.cancelDelay(this.timer);if(this.frame!==null)this.o.cancelFrame(this.frame);this.timer=this.frame=null;this.mx=this.my=0;this.active=false;this.gesture=null;}
 }
-root.DoubleTapMouse=DoubleTapMouse;if(typeof module!=='undefined')module.exports.DoubleTapMouse=DoubleTapMouse;
+root.HoldMouse=HoldMouse;if(typeof module!=='undefined')module.exports.HoldMouse=HoldMouse;
 })(typeof window==='undefined'?globalThis:window);

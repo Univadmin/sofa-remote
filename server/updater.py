@@ -1,6 +1,8 @@
 """GitHub release downloads with SHA-256 validation and staged Windows replacement."""
 import asyncio
 import hashlib
+import json
+import time
 import os
 from pathlib import Path
 import re
@@ -63,24 +65,30 @@ class Updater:
             except Exception as exc:
                 self.status.update(state='error',error=str(exc)[:160])
             return self.status
-    def install(self):
+    async def install(self):
         if os.name!='nt' or not getattr(sys,'frozen',False) or not self.status['ready']: raise ValueError('No staged Windows update')
+        from .windows_runtime import UPDATE_SCRIPT, powershell
         target=Path(sys.executable); staged=self.state/f'SofaRemote-{self.status["latest"]}.exe'
-        # PowerShell receives paths as parameters, not interpolated executable code.
-        script=self.state/'apply-update.ps1'
-        script.write_text('''param([int]$ProcessId,[string]$Target,[string]$Staged)
-Wait-Process -Id $ProcessId -ErrorAction SilentlyContinue
-$Backup = $Target + '.previous'
-try {
-  Copy-Item -LiteralPath $Target -Destination $Backup -Force
-  Copy-Item -LiteralPath $Staged -Destination $Target -Force
-  Start-Process -FilePath $Target
-} catch {
-  if (Test-Path -LiteralPath $Backup) { Copy-Item -LiteralPath $Backup -Destination $Target -Force }
-  Start-Process -FilePath $Target
-}
-''',encoding='utf-8')
-        subprocess.Popen(['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',str(script),str(os.getpid()),str(target),str(staged)],creationflags=0x08000000|0x00000008,close_fds=True)
+        if not staged.is_file():raise ValueError('Staged update missing')
+        if self.status.get('state')=='installing':raise ValueError('Update already installing')
+        script=self.state/'apply-update.ps1';script.write_text(UPDATE_SCRIPT,encoding='utf-8-sig')
+        ready=self.state/'helper.ready';ready.unlink(missing_ok=True)
+        pause=self.state/'installing';pause.write_text(str(time.time()))
+        config=self.state/'install.json'
+        config.write_text(json.dumps({'ProcessId':os.getpid(),'Target':str(target),'Staged':str(staged),
+            'Arguments':subprocess.list2cmdline(sys.argv[1:]),'Health':getattr(self,'health_url','http://127.0.0.1:8765/api/info'),
+            'Version':self.status['latest'],'Ready':str(ready),'Pause':str(pause),'Log':str(self.state/'update.log')}),encoding='utf-8')
+        try:
+            process=powershell(script,config)
+            for _ in range(100):
+                if ready.exists():
+                    self.status['state']='installing';return
+                if process.poll() is not None:break
+                await asyncio.sleep(.1)
+            process.terminate()
+            raise ValueError('Güncelleme yardımcısı başlayamadı; PC kumandası açık bırakıldı')
+        except Exception:
+            pause.unlink(missing_ok=True);raise
     async def background(self):
         while True:
             await self.check();await asyncio.sleep(6*3600)

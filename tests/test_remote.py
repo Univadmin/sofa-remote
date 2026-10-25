@@ -117,8 +117,15 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         response=await self.client.get('/api/icon',params={'url':'http://127.0.0.1/private'});self.assertEqual(response.status,404)
         await extension.close();await ws.close()
     async def test_downloads_status_no_network(self):
-        await self.connect();d=await (await self.client.get('/api/updates')).json();self.assertEqual(d['current'],'0.3.1');self.assertFalse(d['ready'])
+        await self.connect();d=await (await self.client.get('/api/updates')).json();self.assertEqual(d['current'],'0.3.2');self.assertFalse(d['ready'])
         self.assertEqual((await self.client.post('/api/updates/install')).status,400)
+    async def test_browser_focus_broadcast_does_not_send_field_contents(self):
+        await self.connect();phone=await self.client.ws_connect('/api/ws');await phone.receive_json()
+        browser=await self.client.ws_connect('/api/browser',headers={'Origin':'chrome-extension://test'})
+        await browser.send_json({'type':'keyboard-focus','active':True,'text':'never-forward-this'})
+        event=await phone.receive_json(timeout=2)
+        self.assertEqual(event,{'type':'keyboard-focus','active':True})
+        await phone.close();await browser.close()
     async def test_expired_session(self):
         await self.connect();self.app['remote'].tokens.clear();self.assertEqual((await self.client.get('/api/shortcuts')).status,401)
     async def test_invalid_macro(self):

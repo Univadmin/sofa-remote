@@ -9,11 +9,10 @@ test('cancel releases held mouse and forgets the gesture',()=>{const r=rig();r.g
 test('two finger tap is right click',()=>{const r=rig();r.g.down(r.p(0,0,1));r.g.down(r.p(20,0,2));r.at(70);r.g.up(r.p(0,0,1));r.g.up(r.p(20,0,2));assert.deepEqual(r.events,[['click','right']])});
 test('stale second tap does not start dragging',()=>{const r=rig();r.g.down(r.p());r.at(50);r.g.up(r.p());r.at(600);r.g.down(r.p());assert.deepEqual(r.events,[['click','left']])});
 
-const {DoubleTapMouse}=require('../web/gestures.js');
-function fullRig(){let time=0,id=0;const events=[];const g=new DoubleTapMouse({now:()=>time,speed:()=>1,schedule:()=>++id,cancelFrame:()=>{},move:(x,y)=>events.push(['move',x,y]),click:b=>events.push(['click',b])});return {g,events,at:t=>time=t,p:(x=0,y=0)=>({pointerId:1,clientX:x,clientY:y})};}
-test('full screen single tap leaves the app alone and sends no PC click',()=>{const r=fullRig();assert.equal(r.g.down(r.p()),false);r.at(60);assert.deepEqual(r.g.up(r.p()),{active:false,moved:false});assert.deepEqual(r.events,[])});
-test('full screen single swipe never moves or clicks the PC',()=>{const r=fullRig();r.g.down(r.p());r.g.move(r.p(40,20));r.g.up(r.p(60,40));assert.deepEqual(r.events,[])});
-test('full screen second tap activates movement, then left-clicks on release',()=>{const r=fullRig();r.g.down(r.p());r.at(60);r.g.up(r.p());r.at(170);assert.equal(r.g.down(r.p()),true);r.g.move(r.p(45,20));assert.deepEqual(r.events,[]);r.at(800);r.g.up(r.p(60,25));assert.deepEqual(r.events,[['move',60,25],['click','left']])});
-test('full screen late second touch does not activate the mouse',()=>{const r=fullRig();r.g.down(r.p());r.at(60);r.g.up(r.p());r.at(500);assert.equal(r.g.down(r.p()),false);r.g.move(r.p(40,20));r.g.up(r.p(40,20));assert.deepEqual(r.events,[])});
-test('full screen second touch far from the first is an ordinary touch',()=>{const r=fullRig();r.g.down(r.p());r.at(60);r.g.up(r.p());r.at(150);assert.equal(r.g.down(r.p(200,200)),false);r.g.up(r.p(200,200));assert.deepEqual(r.events,[])});
-test('full screen cancel never produces a left click',()=>{const r=fullRig();r.g.down(r.p());r.at(60);r.g.up(r.p());r.at(150);r.g.down(r.p());r.g.move(r.p(50,20));r.g.reset();assert.equal(r.g.up(r.p(50,20)),null);assert.deepEqual(r.events,[])});
+const {HoldMouse}=require('../web/gestures.js');
+function fullRig(){let activate;const events=[];const g=new HoldMouse({speed:()=>1,delay:f=>{activate=f;return 1},cancelDelay:()=>{activate=null},schedule:()=>1,cancelFrame:()=>{},move:(x,y)=>events.push(['move',x,y]),click:b=>events.push(['click',b])});return {g,events,hold:()=>activate?.(),p:(x=0,y=0)=>({pointerId:1,clientX:x,clientY:y})};}
+test('quick taps including double taps never activate full-screen mouse',()=>{const r=fullRig();for(let i=0;i<2;i++){r.g.down(r.p());assert.deepEqual(r.g.up(r.p()),{active:false,moved:false})}assert.deepEqual(r.events,[])});
+test('hold activates movement and clicks only on release',()=>{const r=fullRig();r.g.down(r.p());r.hold();r.g.move(r.p(60,25));r.g.up(r.p(60,25));assert.deepEqual(r.events,[['move',60,25],['click','left']])});
+test('ordinary scrolling cancels the pending long press',()=>{const r=fullRig();r.g.down(r.p());r.g.move(r.p(0,30));r.hold();r.g.up(r.p(0,60));assert.deepEqual(r.events,[])});
+test('cancel during active hold never clicks',()=>{const r=fullRig();r.g.down(r.p());r.hold();r.g.move(r.p(30,10));r.g.reset();assert.equal(r.g.up(r.p()),null);assert.deepEqual(r.events,[])});
+test('stationary hold makes exactly one release click',()=>{const r=fullRig();r.g.down(r.p());r.hold();r.g.up(r.p());assert.deepEqual(r.events,[['click','left']])});
