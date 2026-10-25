@@ -183,6 +183,7 @@ setInterval(()=>{if(!document.hidden)refreshGlobalTabs()},4000);
 
 function openPhoneKeyboard(){
  if(document.hidden||$('#sheet').open)return;
+ resetTextInputs();
  let field=document.querySelector('.keyboard-live');
  if(!field){paneTypes[1]='keyboard';storage.set('panes',paneTypes);renderPane(1);field=document.querySelector('#pane-1 .keyboard-live')}
  field.focus({preventScroll:true});window.SofaNative?.showKeyboard?.();

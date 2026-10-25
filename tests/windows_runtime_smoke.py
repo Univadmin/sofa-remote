@@ -60,6 +60,9 @@ def main():
                 pid=data['pid']
             print('Supervisor: server automatically restarted after two process exits')
         finally:
-            stop.write_text('stop');worker.terminate();kill_tree(worker.pid)
+            stop.write_text('stop');kill_tree(worker.pid);worker.wait(timeout=10)
             if (watch/'started.json').exists():kill_tree(json.loads((watch/'started.json').read_text())['pid'])
+            def remove_executable():
+                target.unlink(missing_ok=True);return True
+            wait(remove_executable,seconds=20)
 if __name__=='__main__':main()

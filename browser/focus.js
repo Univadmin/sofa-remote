@@ -9,3 +9,4 @@ function report(){
 }
 document.addEventListener('focusin',report,true);document.addEventListener('focusout',()=>setTimeout(report,0),true);
 window.addEventListener('focus',()=>{previous='';report()});report();
+chrome.runtime.onMessage.addListener(message=>{if(message.type==='focus-probe'){previous='';report();}});

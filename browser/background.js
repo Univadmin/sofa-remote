@@ -14,7 +14,7 @@ async function command(d){
 function connect(){
   if(connecting||socket?.readyState===0||socket?.readyState===1)return;connecting=true;
   socket=new WebSocket('ws://127.0.0.1:8765/api/browser');
-  socket.onopen=()=>{connecting=false;publish()};
+  socket.onopen=()=>{connecting=false;publish();probeFocus()};
   socket.onmessage=async event=>{const d=JSON.parse(event.data);if(d.type!=='tab')return;try{await command(d);socket.send(JSON.stringify({requestId:d.requestId,ok:true}))}catch(e){if(socket.readyState===1)socket.send(JSON.stringify({requestId:d.requestId,error:e.message}))}};
   socket.onclose=()=>{connecting=false;setTimeout(connect,3000)};socket.onerror=()=>{connecting=false};
 }
@@ -29,3 +29,8 @@ chrome.runtime.onMessage.addListener((message,sender)=>{
   if(tab.active&&win.focused&&socket?.readyState===1)socket.send(JSON.stringify({type:'keyboard-focus',active:message.active,tabId:tab.id}));
  })).catch(()=>{});
 });
+async function probeFocus(){
+ try{const tabs=await chrome.tabs.query({active:true,lastFocusedWindow:true});for(const tab of tabs)await chrome.tabs.sendMessage(tab.id,{type:'focus-probe'}).catch(()=>{});}catch{}
+}
+chrome.tabs.onActivated.addListener(probeFocus);
+chrome.windows.onFocusChanged.addListener(probeFocus);

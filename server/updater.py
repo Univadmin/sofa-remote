@@ -81,7 +81,7 @@ class Updater:
             'Version':self.status['latest'],'Ready':str(ready),'Pause':str(pause),'Log':str(self.state/'update.log')}),encoding='utf-8')
         try:
             process=powershell(script,config)
-            for _ in range(100):
+            for _ in range(200):
                 if ready.exists():
                     self.status['state']='installing';return
                 if process.poll() is not None:break
