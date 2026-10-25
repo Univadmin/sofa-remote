@@ -351,7 +351,9 @@ def main():
             previous=None
             while True:
                 try:
-                    current=monitor.focused() or app['remote'].adapter.keyboard_focus()
+                    sample=monitor.sample()
+                    current=sample['identity'] if sample and sample['active'] else None
+                    if not sample or not sample['recognized']:current=app['remote'].adapter.keyboard_focus()
                     app['remote'].keyboard_focus=current
                     if current!=previous:
                         previous=current

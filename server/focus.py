@@ -1,79 +1,70 @@
-"""Read Windows edit focus metadata through the system UI Automation provider."""
-import json
+"""Windows UI Automation focus metadata, queried off the server thread."""
 import os
 from pathlib import Path
+import threading
 import time
 
-UIA_HELPERS = r'''Add-Type -AssemblyName UIAutomationClient
-Add-Type -AssemblyName UIAutomationTypes
-# Load the standard Win32/Windows Forms client-side accessibility providers.
-try {
- Add-Type -AssemblyName UIAutomationClientsideProviders
- $proxy=[AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.GetName().Name -eq 'UIAutomationClientsideProviders' } | Select-Object -First 1
- if($proxy){[System.Windows.Automation.ClientSettings]::RegisterClientSideProviderAssembly($proxy.GetName())}
-} catch {}
-function Get-EditFocus($Element) {
-  $active=$false;$identity='';$kind='';$errorType=''
-  try {
-    if ($Element) { $kind=$Element.Current.ControlType.ProgrammaticName }
-    if ($Element -and $Element.Current.IsEnabled -and $Element.Current.IsKeyboardFocusable) {
-      $type=$Element.Current.ControlType
-      if ($type -eq [System.Windows.Automation.ControlType]::Edit -or $type -eq [System.Windows.Automation.ControlType]::ComboBox -or $type -eq [System.Windows.Automation.ControlType]::Document) {
-        $pattern=$null
-        if ($Element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$pattern)) {
-          $active=!$pattern.Current.IsReadOnly
-        } elseif ($type -eq [System.Windows.Automation.ControlType]::Edit) {
-          $active=$true
-        } elseif ($Element.TryGetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern,[ref]$pattern)) {
-          $readOnly=$pattern.DocumentRange.GetAttributeValue([System.Windows.Automation.TextPattern]::IsReadOnlyAttribute)
-          $active=($readOnly -is [bool] -and !$readOnly)
-        }
-        if ($active) { $identity=($Element.Current.ProcessId.ToString()+':'+($Element.GetRuntimeId() -join '.')) }
-      }
-    }
-  } catch { $errorType=$_.Exception.Message }
-  # No names, field values or password contents are queried.
-  return @{active=$active;identity=$identity;controlType=$kind;error=$errorType}
-}
-'''
+EDIT,COMBOBOX,DOCUMENT=50004,50003,50030
 
-FOCUS_SCRIPT = r'''param([string]$Config)
-$ErrorActionPreference = 'Stop'
-$c=Get-Content -LiteralPath $Config -Raw -Encoding UTF8 | ConvertFrom-Json
-''' + UIA_HELPERS + r'''
-$parent=Get-Process -Id $c.ProcessId
-while (!$parent.HasExited) {
-  try { $state=Get-EditFocus ([System.Windows.Automation.AutomationElement]::FocusedElement) }
-  catch { $state=@{active=$false;identity='';error=$_.Exception.Message} }
-  $json=$state | ConvertTo-Json -Compress
-  try {
-    [IO.File]::WriteAllText($c.State+'.tmp',$json,(New-Object Text.UTF8Encoding($false)))
-    Move-Item -LiteralPath ($c.State+'.tmp') -Destination $c.State -Force
-  } catch {}
-  Start-Sleep -Milliseconds 400
-  $parent.Refresh()
-}
-'''
+def inspect_focus(element,uia):
+    result={'active':False,'identity':None,'recognized':False}
+    if not element:return result
+    kind=element.CurrentControlType
+    result['recognized']=kind in (EDIT,COMBOBOX,DOCUMENT)
+    if not result['recognized'] or not element.CurrentIsEnabled or not element.CurrentIsKeyboardFocusable:return result
+    editable=False
+    try:
+        value=element.GetCurrentPattern(uia.UIA_ValuePatternId).QueryInterface(uia.IUIAutomationValuePattern)
+        editable=not value.CurrentIsReadOnly
+    except Exception:
+        if kind==EDIT:editable=True
+        elif kind==DOCUMENT:
+            try:
+                text=element.GetCurrentPattern(uia.UIA_TextPatternId).QueryInterface(uia.IUIAutomationTextPattern)
+                readonly=text.DocumentRange.GetAttributeValue(uia.UIA_IsReadOnlyAttributeId)
+                editable=isinstance(readonly,bool) and not readonly
+            except Exception:pass
+    if editable:
+        # Runtime IDs identify fields without reading names, values or passwords.
+        identity=tuple(element.GetRuntimeId() or (element.CurrentNativeWindowHandle,))
+        result.update(active=True,identity=(element.CurrentProcessId,identity))
+    return result
 
 class FocusMonitor:
     def __init__(self,state):
-        self.state=Path(state);self.file=self.state/'focus.json';self.process=None
+        self.state=Path(state);self._sample=None;self._sample_time=0
+        self.stop=threading.Event();self.thread=None;self.error=''
     def start(self):
         if os.name!='nt':return
-        from .windows_runtime import powershell
-        self.state.mkdir(parents=True,exist_ok=True)
-        self.file.unlink(missing_ok=True)
-        script=self.state/'focus.ps1';script.write_text(FOCUS_SCRIPT,encoding='utf-8-sig')
-        config=self.state/'focus-config.json';config.write_text(json.dumps({'ProcessId':os.getpid(),'State':str(self.file)}),encoding='utf-8')
-        self.process=powershell(script,config,mta=True)
-    def focused(self):
         try:
-            if time.time()-self.file.stat().st_mtime>4:return None
-            data=json.loads(self.file.read_text(encoding='utf-8-sig'))
-            return data['identity'] if data.get('active') is True else None
-        except (OSError,ValueError,KeyError):return None
+            # Import on the main thread so comtypes' default COM initialization
+            # stays there; the worker explicitly owns its MTA apartment.
+            import comtypes
+        except ImportError:
+            self.error='UI Automation unavailable';return
+        self.thread=threading.Thread(target=self._run,name='sofa-focus',daemon=True);self.thread.start()
+    def _run(self):
+        import comtypes
+        comtypes.CoInitializeEx(0)
+        try:
+            from comtypes.client import GetModule,CreateObject
+            uia=GetModule(str(Path(os.environ['SystemRoot'])/'System32'/'UIAutomationCore.dll'))
+            automation=CreateObject(uia.CUIAutomation,interface=uia.IUIAutomation)
+            while not self.stop.is_set():
+                try:
+                    sample=inspect_focus(automation.GetFocusedElement(),uia);self.error=''
+                except Exception as exc:
+                    sample=None;self.error=type(exc).__name__
+                self._sample=sample;self._sample_time=time.monotonic()
+                self.stop.wait(.4)
+        except Exception as exc:
+            self.error=type(exc).__name__
+        finally:comtypes.CoUninitialize()
+    def sample(self):
+        return self._sample if time.monotonic()-self._sample_time<4 else None
+    def focused(self):
+        sample=self.sample()
+        return sample.get('identity') if sample and sample.get('active') else None
     def close(self):
-        if self.process and self.process.poll() is None:
-            self.process.terminate()
-            try:self.process.wait(timeout=3)
-            except Exception:pass
+        self.stop.set()
+        if self.thread:self.thread.join(timeout=1)

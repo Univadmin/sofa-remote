@@ -25,6 +25,7 @@ def kill_tree(pid):subprocess.run(['taskkill','/PID',str(pid),'/T','/F'],capture
 def main():
     with tempfile.TemporaryDirectory(prefix="sofa update ' space ") as temp:
         state=Path(temp);exe=state/'SofaRemote.exe';shutil.copy2('dist/UpdateFixture.exe',exe)
+        subprocess.run([str(exe),'--focus-check','--state',str(state)],check=True,timeout=25)
         port=18768;process=subprocess.Popen([str(exe),'--state',str(state),'--port',str(port)])
         try:
             print('Waiting for updated fixture',flush=True)

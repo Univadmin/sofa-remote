@@ -55,11 +55,10 @@ class PowerShellSyntaxTests(unittest.TestCase):
         import os
         import subprocess
         from server.windows_runtime import UPDATE_SCRIPT,WATCH_SCRIPT
-        from server.focus import FOCUS_SCRIPT
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'script.ps1'
             command="$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile($env:SOFA_PARSE_SCRIPT,[ref]$tokens,[ref]$errors) | Out-Null; if($errors){$errors | Out-String | Write-Output; exit 1}"
-            for source in (UPDATE_SCRIPT,WATCH_SCRIPT,FOCUS_SCRIPT):
+            for source in (UPDATE_SCRIPT,WATCH_SCRIPT):
                 path.write_text(source,encoding='utf-8-sig')
                 result=subprocess.run(['powershell.exe','-NoProfile','-Command',command],env=dict(os.environ,SOFA_PARSE_SCRIPT=str(path)),capture_output=True,text=True)
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)

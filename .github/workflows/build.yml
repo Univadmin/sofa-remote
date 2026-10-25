@@ -106,8 +106,9 @@ jobs:
       - run: python tests/windows_focus_smoke.py
         env:
           PYTHONPATH: .
-      - run: pyinstaller --noconfirm --onefile --name SofaRemote --collect-all aiohttp --add-data "web;web" run.py
-      - run: pyinstaller --noconfirm --onefile --name UpdateFixture --paths . tests/windows_update_fixture.py
+      - run: python -c "from comtypes.client import GetModule; GetModule('UIAutomationCore.dll')"
+      - run: pyinstaller --noconfirm --onefile --name SofaRemote --collect-all aiohttp --collect-all comtypes --add-data "web;web" run.py
+      - run: pyinstaller --noconfirm --onefile --name UpdateFixture --collect-all comtypes --paths . tests/windows_update_fixture.py
       - run: python tests/windows_runtime_smoke.py
         env:
           PYTHONPATH: .
