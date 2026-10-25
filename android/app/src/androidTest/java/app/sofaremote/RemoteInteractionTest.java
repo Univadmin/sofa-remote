@@ -64,7 +64,7 @@ public class RemoteInteractionTest {
     }
     @Test public void pcFocusOpensNativeKeyboardAndSendsText()throws Exception{
         js("fetch('/__focus',{method:'POST'});true");
-        waitFor(()->{boolean[] ready=new boolean[1];InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{View focus=rule.getActivity().getCurrentFocus();ready[0]=focus instanceof EditText&&focus.getRootWindowInsets()!=null&&focus.getRootWindowInsets().isVisible(WindowInsets.Type.ime());});return ready[0];});
+        waitFor(()->{boolean[] ready=new boolean[1];InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{View focus=rule.getActivity().getCurrentFocus();ready[0]=focus instanceof EditText&&focus.getRootWindowInsets()!=null&&focus.getRootWindowInsets().isVisible(WindowInsets.Type.ime())&&focus.getRootWindowInsets().getInsets(WindowInsets.Type.ime()).bottom>100;});return ready[0];});
         screenshot("native-keyboard");onView(withHint("PC’ye yaz…")).perform(typeText("abc"));
         try{waitFor(()->"\"abc\"".equals(js("testSent.filter(x=>x.type==='edit').map(x=>x.text).join('')")));}catch(AssertionError error){throw new AssertionError(js("JSON.stringify(testSent)"),error);}
     }

@@ -211,9 +211,10 @@ setInterval(()=>{if(!document.hidden)refreshGlobalTabs()},4000);
 function openPhoneKeyboard(){
  if(document.hidden||$('#sheet').open)return;
  resetTextInputs();
+ if(window.SofaNative?.showKeyboard){window.SofaNative.showKeyboard();return}
  let field=document.querySelector('.keyboard-live');
  if(!field){paneTypes[1]='keyboard';storage.set('panes',paneTypes);renderPane(1);field=document.querySelector('#pane-1 .keyboard-live')}
- if(window.SofaNative?.showKeyboard){window.SofaNative.showKeyboard();return}field.focus({preventScroll:true});
+ field.focus({preventScroll:true});
  if(!window.SofaNative)toast('Yazmak için klavye alanına dokun');
 }
 
