@@ -1,7 +1,7 @@
 /* Playback checks run only on tabs explicitly opened by a film command. */
 'use strict';
 (()=>{
- let control=null,timer=null,selected=null,firstPosition=null,advances=0,reported=false,armed=false,clickedPlay=false,bridgeSubtitles=false,gestureRequested=false,waitingReason="",startedAt=0;const prepared=new WeakMap();const styles=new Map();
+ let control=null,timer=null,selected=null,firstPosition=null,advances=0,reported=false,armed=false,clickedPlay=false,bridgeSubtitles=false,bridgeContainer=null,gestureRequested=false,waitingReason="",startedAt=0;const prepared=new WeakMap();const styles=new Map();
  const norm=s=>String(s||'').toLocaleLowerCase('tr').replace(/ı/g,'i').normalize('NFKD').replace(/[^\p{L}\p{N}]/gu,'');
  const unavailable=/bu (?:video|içerik|yapım) (?:şu anda )?(?:kullanılamıyor|izlenemiyor|mevcut değil)|ülkenizde (?:mevcut|kullanılabilir) değil|bulunduğunuz (?:bölgede|konumda).*?(?:mevcut değil|izlenemiyor)|not available in your (?:country|region|location)|this (?:video|title|content) is (?:currently )?(?:unavailable|not available)|video unavailable/i;
  function signal(state,extra={}){chrome.runtime.sendMessage({type:'movie-state',requestId:control.requestId,state,...extra}).catch(()=>{})}
@@ -28,14 +28,17 @@
   if(window!==window.top)window.parent.postMessage({sofaCinema:control?.requestId},'*');
  }
  window.addEventListener('message',e=>{
-  if(e.source===window&&control&&e.data?.type==='sofa-player-result'&&e.data.requestId===control.requestId){bridgeSubtitles=bridgeSubtitles||e.data.turkish_subtitles===true;return;}
+  if(e.source===window&&control&&e.data?.type==='sofa-player-result'&&e.data.requestId===control.requestId){bridgeSubtitles=bridgeSubtitles||e.data.turkish_subtitles===true;if(typeof e.data.containerId==='string')bridgeContainer=e.data.containerId;return;}
   if(!control||![e.data?.sofaCinema,e.data?.sofaCinemaExit].includes(control.requestId))return;
   const frame=[...document.querySelectorAll('iframe')].find(f=>f.contentWindow===e.source);
   if(frame){if(e.data.sofaCinemaExit){restore();if(window!==window.top)window.parent.postMessage({sofaCinemaExit:control.requestId},'*');}else{frame.allowFullscreen=true;expand(frame)}}
  });
  function startVisible(video,gesture=false){
-  video.muted=false;video.volume=video.volume||1;expand(video);
-  if(gesture&&!document.fullscreenElement)video.requestFullscreen?.().catch(()=>{});
+  video.muted=false;video.volume=video.volume||1;
+  const container=document.getElementById(bridgeContainer),stage=bridgeSubtitles&&container?.contains(video)?container:video;
+  expand(stage);
+  if(stage!==video){if(!styles.has(video))styles.set(video,video.getAttribute('style'));for(const key of ['width','height'])video.style.setProperty(key,'100%','important');video.style.setProperty('object-fit','contain','important');}
+  if(gesture&&!document.fullscreenElement)stage.requestFullscreen?.().catch(()=>{});
   video.play().catch(()=>{if(!armed){armed=true;signal('gesture-needed')}});
  }
  document.addEventListener('keydown',e=>{
@@ -99,7 +102,7 @@
   if(message.type==='movie-stop'){stop();return;}
   if(message.type!=='movie-control')return;
   if(control?.requestId===message.requestId){control.titleConfirmed=control.titleConfirmed||message.titleConfirmed;return;}
-  stop();control=message;reported=false;firstPosition=null;advances=0;clickedPlay=false;bridgeSubtitles=false;gestureRequested=false;waitingReason="";startedAt=Date.now();
+  stop();control=message;reported=false;firstPosition=null;advances=0;clickedPlay=false;bridgeSubtitles=false;bridgeContainer=null;gestureRequested=false;waitingReason="";startedAt=Date.now();
   timer=setInterval(tick,500);tick();
  });
 })();

@@ -43,6 +43,8 @@ async def main():
             body=body.replace('src="/movie.webm"','')+'<script>const v=document.querySelector("video");v.onclick=()=>{if(document.hasFocus()&&navigator.userActivation.isActive&&!v.getAttribute("src"))v.src="/movie.webm"};</script>'
         if path=='/jw':
             body='<div class="jwplayer" id="jw"><video controls muted preload="none"></video></div><script>const v=document.querySelector("video");window.selectedCaption=-1;window.jwplayer=()=>({getCaptionsList:()=>[{label:"Off"},{label:"Türkçe"}],setCurrentCaptions:i=>window.selectedCaption=i,setMute:m=>v.muted=m,play:()=>{if(!v.getAttribute("src"))v.src="/movie.webm";v.play().catch(()=>{})}});</script>'
+        if path=='/playerjs':
+            body='<div id="player"><video controls muted></video></div><script>window.player={api:(command,value)=>{const v=document.querySelector("video");if(command==="subtitles")return "[Türkçe]/sub.vtt,[English]/en.vtt";if(command==="id")return "player";if(command==="subtitle")window.chosenSubtitle=value;if(command==="play"){if(!v.getAttribute("src"))v.src="/movie.webm";v.play().catch(()=>{})}}};</script>'
         if path=='/mse':
             body += '''<script>const v=document.querySelector("video"),m=new MediaSource();window.loadCalls=0;const load=HTMLMediaElement.prototype.load;HTMLMediaElement.prototype.load=function(){window.loadCalls++;return load.call(this)};v.src=URL.createObjectURL(m);m.addEventListener("sourceopen",async()=>{const b=m.addSourceBuffer('video/webm; codecs="vp8"');const bytes=await(await fetch("/movie.webm")).arrayBuffer();b.addEventListener("updateend",()=>{if(m.readyState==="open")m.endOfStream()},{once:true});b.appendBuffer(bytes)},{once:true});</script>'''
         if path=='/delayed-tracks':
@@ -81,7 +83,7 @@ async def main():
                 result=await command('movie-probe','/turkish',turkish=True);assert result.get('ok') and not result['turkish_subtitles'],result
                 result=await command('movie-probe','/turkish',3000);assert result.get('error'),result
                 print('Real Chromium: lazy metadata loads; Turkish original plays without subtitles; foreign movie rejected without subtitles',flush=True)
-                for path in ('/custom','/jw','/mse','/delayed-tracks','/video-init'):
+                for path in ('/custom','/jw','/playerjs','/mse','/delayed-tracks','/video-init'):
                     result=await command('movie-probe',path);assert result.get('ok'),(path,result)
                     print('Real Chromium: verified '+path,flush=True)
                 for path in ('/info','/blocked'):
@@ -97,6 +99,12 @@ async def main():
                 await played.keyboard.press('Escape');await played.wait_for_function("document.querySelector('video').getAttribute('style')==='width:320px'")
                 print('Real Chromium: trusted input starts unmuted movie, enters fullscreen, Escape restores layout',flush=True)
                 await played.close()
+                result=await command('movie-play','/playerjs');assert result.get('ok'),result
+                played=next(p for p in context.pages if p.url.endswith('/playerjs'))
+                assert await played.evaluate('window.chosenSubtitle===0')
+                rect=await played.locator('#player').bounding_box();size=await played.evaluate('({w:innerWidth,h:innerHeight})');assert rect['width']>=size['w']*.9 and rect['height']>=size['h']*.9
+                await played.keyboard.press('Escape');await played.wait_for_function("!document.querySelector('#player').getAttribute('style')");await played.close()
+                print('Real Chromium: custom caption container preserved in fullscreen',flush=True)
                 result=await command('movie-play','/nested');assert result.get('ok') and result.get('fullscreen'),result
                 played=next(p for p in context.pages if p.url.endswith('/nested'))
                 frame=next(f for f in played.frames if f.url.endswith('/inner'))
