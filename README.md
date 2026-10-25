@@ -12,7 +12,7 @@ Windows bilgisayarını telefondan kontrol et. Mouse, klavye, medya ve tarayıc�
 | Android 8+ | [SofaRemote-Android.apk](https://github.com/Univadmin/sofa-remote/releases/latest/download/SofaRemote-Android.apk) |
 | Chrome / Edge sekme eklentisi | [SofaRemote-Browser.zip](https://github.com/Univadmin/sofa-remote/releases/latest/download/SofaRemote-Browser.zip) |
 
-APK ve EXE sürüm numaraları, dosya boyutları ve önceki sürümler [Downloads sayfasında](https://github.com/Univadmin/sofa-remote/releases) bulunur. Uygulama içinde de **Downloads** alanı vardır.
+APK ve EXE sürüm numaraları, dosya boyutları ve önceki sürümler [Downloads sayfasında](https://github.com/Univadmin/sofa-remote/releases) bulunur. Uygulama içindeki **Güncelleme** alanı sürüm bilgisi ve güncelleme kontrolünü gösterir.
 
 ## Kurulum
 
@@ -31,7 +31,7 @@ v0.2 Android uygulaması yeni, genel bir paket kimliği ve kalıcı yayın imzas
 
 Ekran iki sabit alana ayrılır. Her alanın üstündeki listeden bağımsız kumanda seç: **Mouse + Medya**, **Klavye + Tarayıcı**, **Mouse + Uygulamalar** gibi. Düzen düğmesiyle üst üste veya yan yana görünümü seç. Tercihler hatırlanır; paneller kendi içlerinde kayar.
 
-- **Mouse:** touchpad, sol/sağ/orta tık, iki parmak kaydırma, sürükleme, hız ve solak ayarı.
+- **Mouse:** touchpad, sol/sağ/orta tık, iki parmak kaydırma, hız ve solak ayarı. Çift dokunup ikinci dokunuşu basılı tutarak klasör veya pencere sürükle. **Düzen → Bütün ekranı mouse olarak kullan** ayarıyla ekranın her yerinde kaydır; bıraktığında sol tık gönderilir. Kısa düğme dokunuşları normal işlevini korur.
 - **Klavye:** telefon klavyesiyle anlık yazma, silme, Enter; Ctrl/Alt/Shift/Win, F1–F12 ve özel birleşimler. Yazı alanında yapılan değişiklikler PC’deki odaklanmış alana gönderilir. PC imlecini başka yolla taşırsan **Yeni alan** düğmesine dokun.
 - **Medya:** ses, sessiz, oynat/duraklat; genel site, YouTube ve Netflix profilleri. Android uygulaması ön plandayken telefonun ses düğmeleri PC sesini değiştirir.
 - **Tarayıcı / Sekmeler:** gezinme, sekme açma/kapatma/geçiş; eklenti bağlıysa sekmeleri adlarıyla listeleme, doğrudan seçme, yenileme ve kopyalama.
@@ -39,7 +39,7 @@ Ekran iki sabit alana ayrılır. Her alanın üstündeki listeden bağımsız ku
 - **Tüm butonlar:** aranabilir komut kataloğu. Desteklenen komutlar `+` düğmesiyle kısayola eklenebilir.
 - **Araçlar:** ekran önizlemesi, iki yönlü metin panosu ve güç işlemleri.
 
-Üst kısayol şeridi isimler yerine sitenin sembolünü gösterir. Sembol bulunamazsa yedek simge kullanılır; düğmenin erişilebilir adı ve açıklaması korunur. Site simgeleri ilgili sitenin `/favicon.ico` adresinden alınır. Özel makrolara kendi sembolünü verebilirsin.
+En üst şerit iki eşit alandır: solda kaydırılabilir site/makro kısayolları, sağda yalnızca sekme simgeleri. Sağdaki simgelere dokunmak sekmeler arasında geçiş yapar. Sekme listesi Tarayıcı panelinin başındadır; yenileme ve kopyalama ayrı satırdadır. Simgeler açık sekmenin favicon bilgisi veya sitenin bildirdiği internet simgesi üzerinden alınır; bulunamazsa yedek simge gösterilir. URL içermeyen makrolara kendi sembolünü verebilirsin.
 
 ## Tarayıcı sekmelerini listeleme
 
@@ -54,8 +54,8 @@ Eklenti yalnızca aynı bilgisayardaki Sofa Remote sunucusuna bağlanır. Telefo
 ## Güncellemeler
 
 - Windows ve Android açılışta GitHub’daki son kararlı sürümü kontrol eder.
-- Paketli Windows uygulaması yeni EXE’yi otomatik indirip SHA-256 değerini doğrular. Downloads → **PC güncellemesini uygula** ile program yeniden başlatılır. Önceki EXE yedeği saklanır.
-- Android yeni APK’yi Wi-Fi üzerinden indirip SHA-256 değerini doğrular. Downloads → **Android güncellemesini kur** Android’in standart kurulum onayını açar. Gerekirse bu uygulamadan yüklemeye bir defa izin verilir. Sessiz kurulum yapılmaz.
+- Paketli Windows uygulaması yeni EXE’yi otomatik indirip SHA-256 değerini doğrular. **Güncelleme → Güncellemeleri kontrol et** sonrasında paket hazırsa yeniden başlatma onayı açılır. Önceki EXE yedeği saklanır.
+- Android yeni APK’yi Wi-Fi üzerinden indirip SHA-256 değerini doğrular. Uygulama ön plandayken indirme tamamlanınca Android’in standart kurulum onayı doğrudan açılır. Gerekirse Sofa Remote için yükleme iznini aç; uygulamaya dönünce kurulum devam eder. Tarayıcı açma veya APK dosyasını elle bulma gerekmez. İptal edilen kurulum **Güncellemeleri kontrol et** ile yeniden başlatılabilir.
 - İnternet yokken yerel kumanda çalışmaya devam eder. Güncelleme denetimi başarısızsa daha sonra tekrar denenebilir.
 
 ## Kullanım bilgileri

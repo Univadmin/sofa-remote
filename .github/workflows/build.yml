@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --check web/app.js && node --check browser/background.js
+      - run: node --check web/app.js && node --check browser/background.js && node --test tests/gestures.test.cjs
   android:
     runs-on: ubuntu-latest
     steps:

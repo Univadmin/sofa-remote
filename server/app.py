@@ -18,6 +18,7 @@ from .network import local_address
 from .version import VERSION, REPOSITORY
 from .updater import Updater
 from .discovery import start_discovery
+from .icons import Icons
 
 ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent.parent))
 STATE = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'SofaRemote'
@@ -80,6 +81,7 @@ class Remote:
         self.controller=None
         self.browser=None; self.browser_tabs=[]; self.browser_pending={}
         self.updater=Updater(self.state)
+        self.icons=Icons()
     def token(self):
         token=secrets.token_urlsafe(32); self.tokens[token]=time.monotonic()+24*3600; return token
     def authorized(self, token): return self.tokens.get(token,0)>time.monotonic()
@@ -99,6 +101,10 @@ class Remote:
                 if action['type'] not in ('url','keys','text','delay','profile','launch'): raise ValueError('Unsupported macro action')
         path=self.state/'shortcuts.json'; temp=path.with_suffix('.tmp')
         temp.write_text(json.dumps(items,ensure_ascii=False),encoding='utf-8'); temp.replace(path)
+    async def publish_tabs(self):
+        if self.controller is not None and not self.controller.closed:
+            try: await self.controller.send_json({'type':'tabs','tabs':self.browser_tabs,'connected':self.browser is not None})
+            except ConnectionError: pass
     async def execute(self, action):
         d=validate_action(action); a=self.adapter; kind=d['type']
         if kind=='move': a.move(d['x'],d['y'])
@@ -158,6 +164,22 @@ async def security(request, handler):
     response.headers['Content-Security-Policy']="default-src 'self'; img-src 'self' data: https:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'"
     return response
 
+def safe_favicon(value):
+    if not isinstance(value,str) or len(value)>32768:return ''
+    if value.startswith(('https://','http://','data:image/png;base64,','data:image/x-icon;base64,','data:image/webp;base64,','data:image/jpeg;base64,','data:image/gif;base64,')):return value
+    return ''
+
+async def site_icon(request):
+    r=request.app['remote'];page=request.query.get('url','')
+    allowed={tab['url'] for tab in r.browser_tabs}
+    allowed.update(a['url'] for item in r.load_shortcuts() for a in item['actions'] if a['type']=='url')
+    if page not in allowed:raise web.HTTPNotFound()
+    preferred=next((tab.get('favicon','') for tab in r.browser_tabs if tab['url']==page),'')
+    try:
+        image=await r.icons.get(page,preferred)
+        return web.Response(body=image,content_type='image/png',headers={'Cache-Control':'private, max-age=3600'})
+    except Exception:raise web.HTTPNotFound(text='Icon unavailable')
+
 async def info(request):
     return web.json_response({'service':'sofa-remote','protocol':1,'name':socket.gethostname(),'version':VERSION,'passwordRequired':False})
 
@@ -167,7 +189,7 @@ async def connect_device(request):
     return response
 
 async def browser_handler(request):
-    r=request.app['remote'];ws=web.WebSocketResponse(heartbeat=20,max_msg_size=262144)
+    r=request.app['remote'];ws=web.WebSocketResponse(heartbeat=20,max_msg_size=2500000)
     await ws.prepare(request)
     if r.browser is not None: await r.browser.close()
     r.browser=ws
@@ -180,8 +202,9 @@ async def browser_handler(request):
                     tabs=[]
                     for tab in data['tabs'][:200]:
                         if type(tab.get('id')) is int and type(tab.get('windowId')) is int:
-                            tabs.append({'id':tab['id'],'windowId':tab['windowId'],'title':str(tab.get('title',''))[:200], 'url':str(tab.get('url',''))[:2048],'active':bool(tab.get('active'))})
+                            tabs.append({'id':tab['id'],'windowId':tab['windowId'],'title':str(tab.get('title',''))[:200], 'url':str(tab.get('url',''))[:2048],'active':bool(tab.get('active')), 'favicon':safe_favicon(tab.get('favicon',tab.get('favIconUrl','')))})
                     r.browser_tabs=tabs
+                    await r.publish_tabs()
                 elif data.get('requestId') in r.browser_pending:
                     future=r.browser_pending[data['requestId']]
                     if not future.done(): future.set_result(data)
@@ -189,6 +212,7 @@ async def browser_handler(request):
     finally:
         if r.browser is ws:
             r.browser=None;r.browser_tabs=[]
+            await r.publish_tabs()
             for future in r.browser_pending.values():
                 if not future.done(): future.set_result({'error':'Tarayıcı bağlantısı kesildi'})
     return ws
@@ -259,6 +283,7 @@ def create_app(adapter=None,state_dir=None):
     app['remote']=Remote(adapter if adapter is not None else Windows(),state_dir or STATE)
     app['tasks']=set()
     app.router.add_get('/api/info',info)
+    app.router.add_get('/api/icon',site_icon)
     app.router.add_post('/api/connect',connect_device)
     app.router.add_get('/api/browser',browser_handler)
     app.router.add_get('/api/updates',updates)

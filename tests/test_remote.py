@@ -83,8 +83,15 @@ class IntegrationTests(unittest.IsolatedAsyncioTestCase):
         await ws.send_json({'type':'tab','action':'activate','tabId':7,'id':22});command=await extension.receive_json();self.assertEqual(command['tabId'],7)
         await extension.send_json({'requestId':command['requestId'],'ok':True});self.assertEqual((await ws.receive_json())['id'],22)
         await extension.close();await ws.close()
+    async def test_tab_icons_are_pushed_to_controller(self):
+        await self.connect();ws=await self.client.ws_connect('/api/ws');await ws.receive_json()
+        extension=await self.client.ws_connect('/api/browser',headers={'Origin':'chrome-extension://abcdefghijklmnop'})
+        await extension.send_json({'type':'tabs','tabs':[{'id':9,'windowId':1,'title':'Site','url':'https://example.com','favicon':'https://example.com/custom.png'}]})
+        result=await ws.receive_json();self.assertEqual(result['type'],'tabs');self.assertEqual(result['tabs'][0]['favicon'],'https://example.com/custom.png')
+        response=await self.client.get('/api/icon',params={'url':'http://127.0.0.1/private'});self.assertEqual(response.status,404)
+        await extension.close();await ws.close()
     async def test_downloads_status_no_network(self):
-        await self.connect();d=await (await self.client.get('/api/updates')).json();self.assertEqual(d['current'],'0.2.0');self.assertFalse(d['ready'])
+        await self.connect();d=await (await self.client.get('/api/updates')).json();self.assertEqual(d['current'],'0.3.0');self.assertFalse(d['ready'])
         self.assertEqual((await self.client.post('/api/updates/install')).status,400)
     async def test_expired_session(self):
         await self.connect();self.app['remote'].tokens.clear();self.assertEqual((await self.client.get('/api/shortcuts')).status,401)

@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);deviceList=new LinearLayout(this);deviceList.setOrientation(LinearLayout.VERTICAL);scroll.addView(deviceList);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         Button scan=new Button(this);scan.setText("↻ Ağı yeniden tara");scan.setOnClickListener(v->scanDevices());root.addView(scan);
         Button manual=new Button(this);manual.setText("Adresle bağlan");manual.setOnClickListener(v->askAddress());root.addView(manual);
-        Button updates=new Button(this);updates.setText("Downloads / Güncellemeler");updates.setOnClickListener(v->updater.showDownloads());root.addView(updates);setContentView(root);scanDevices();
+        Button updates=new Button(this);updates.setText("Güncelleme");updates.setOnClickListener(v->updater.showUpdates());root.addView(updates);setContentView(root);scanDevices();
     }
     private void scanDevices(){if(scanning)return;scanning=true;deviceList.removeAllViews();Discovery.scan(this,(address,name)->runOnUiThread(()->{if(!showingDevices||isFinishing())return;Button b=new Button(this);b.setText(name+"\n"+address);b.setOnClickListener(v->openServer(address));deviceList.addView(b);}),()->runOnUiThread(()->{scanning=false;if(showingDevices&&deviceList.getChildCount()==0){TextView text=new TextView(this);text.setText("Bilgisayar bulunamadı. Windows’ta Sofa Remote açık olmalı; özel ağ güvenlik duvarı TCP 8765 / UDP 8766 bağlantısına izin vermeli.");text.setTextColor(Color.LTGRAY);deviceList.addView(text);}}));}
     private void askAddress(){EditText input=new EditText(this);input.setSingleLine(true);input.setHint("http://192.168.1.20:8765");input.setText(server);new AlertDialog.Builder(this).setTitle("Bilgisayar adresi").setView(input).setPositiveButton("Bağlan",(d,w)->{String value=input.getText().toString().trim().replaceAll("/+$","");if(!Discovery.localUrl(value)){Toast.makeText(this,"Yerel ağ IPv4 adresi gir",Toast.LENGTH_LONG).show();return;}server=value;showConnecting();tryLast();}).setNegativeButton("İptal",null).show();}
@@ -63,11 +63,13 @@ public class MainActivity extends Activity {
     }
     private class NativeBridge {
         @JavascriptInterface public void discover(){runOnUiThread(()->showDevices());}
-        @JavascriptInterface public void connectionReady(){failures=0;}
-        @JavascriptInterface public void checkUpdates(){updater.check();}
+        @JavascriptInterface public void connectionReady(){runOnUiThread(()->{failures=0;updater.publish();});}
+        @JavascriptInterface public void checkUpdates(){updater.checkFromUser();}
+        @JavascriptInterface public String updateInfo(){return updater.snapshot().toString();}
         @JavascriptInterface public void installUpdate(){runOnUiThread(()->updater.install());}
     }
-    void updateStatus(String message){runOnUiThread(()->{if(web!=null){String json="{\"message\":"+JSONObject.quote(message)+"}";web.evaluateJavascript("window.dispatchEvent(new CustomEvent('sofa-update',{detail:"+json+"}))",null);}});}
+    void whenActive(Runnable action){runOnUiThread(()->{if(!paused&&!isFinishing())action.run();});}
+    void updateStatus(JSONObject status){runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.dispatchEvent(new CustomEvent('sofa-update',{detail:"+status.toString()+"}))",null);});}
     @Override public boolean dispatchKeyEvent(KeyEvent event){int key=event.getKeyCode();if(!paused&&!showingDevices&&web!=null&&(key==KeyEvent.KEYCODE_VOLUME_UP||key==KeyEvent.KEYCODE_VOLUME_DOWN)){
         if(event.getAction()==KeyEvent.ACTION_DOWN)web.evaluateJavascript("window.dispatchEvent(new CustomEvent('sofa-volume',{detail:"+(key==KeyEvent.KEYCODE_VOLUME_UP?1:-1)+"}))",null);return true;}return super.dispatchKeyEvent(event);}
     @Override public void onBackPressed(){if(!showingDevices)showDevices();else super.onBackPressed();}

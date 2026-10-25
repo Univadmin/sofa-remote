@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sofa Remote Tabs",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Yerel Sofa Remote kumandasından tarayıcı sekmelerini yönetin.",
   "permissions": [
     "tabs",

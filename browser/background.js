@@ -1,6 +1,6 @@
 'use strict';
 let socket, connecting=false;
-async function publish(){if(socket?.readyState!==1)return;const tabs=await chrome.tabs.query({});socket.send(JSON.stringify({type:'tabs',tabs:tabs.map(t=>({id:t.id,windowId:t.windowId,title:t.title||'',url:t.url||'',active:t.active}))}))}
+async function publish(){if(socket?.readyState!==1)return;const tabs=await chrome.tabs.query({});socket.send(JSON.stringify({type:'tabs',tabs:tabs.map(t=>({id:t.id,windowId:t.windowId,title:t.title||'',url:t.url||'',active:t.active,favicon:(t.favIconUrl||'').slice(0,32768)}))}))}
 async function command(d){
   if(d.type!=='tab')return;
   if(d.action==='activate'){const tab=await chrome.tabs.update(d.tabId,{active:true});await chrome.windows.update(tab.windowId,{focused:true})}
