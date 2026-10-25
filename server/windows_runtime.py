@@ -229,7 +229,7 @@ try {
 def powershell(script, config, *, mta=False):
     env=dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT='1')
     # PowerShell 7's inherited module path can hide Windows PowerShell 5 modules.
-    env.pop('PSModulePath',None)
+    env={key:value for key,value in env.items() if key.upper()!='PSMODULEPATH'}
     # Windows propagates PyInstaller's DLL search directory to child processes.
     # External system tools must use Windows DLLs, not bundled application DLLs.
     kernel=None
