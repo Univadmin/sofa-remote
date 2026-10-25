@@ -28,7 +28,7 @@ function connect(){
   clearTimeout(retry);if(stopped)return;if(ws?.readyState===0||ws?.readyState===1)return;
   ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/api/ws`);
   ws.onopen=()=>{status('Bağlı',true);resetLive();window.SofaNative?.connectionReady();refreshGlobalTabs()};
-  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='server-restarting'){restartUntil=Date.now()+300000;status('Bilgisayar güncelleniyor…');return}if(d.type==='keyboard-focus'){if(d.active)openPhoneKeyboard();return}if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.version&&d.version!=='0.3.3'){location.reload();return}if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
+  ws.onmessage=event=>{const d=JSON.parse(event.data);if(d.type==='server-restarting'){restartUntil=Date.now()+300000;status('Bilgisayar güncelleniyor…');return}if(d.type==='keyboard-focus'){if(d.active)openPhoneKeyboard();return}if(d.type==='tabs'){applyTabs(d);return}const p=pending.get(d.id);if(p){clearTimeout(p.timer);pending.delete(d.id);d.type==='error'?p.reject(new Error(d.message)):p.resolve(d)}else if(d.type==='error')toast(d.message);if(d.type==='hello'&&d.version&&d.version!=='0.3.4'){location.reload();return}if(d.type==='hello'&&d.dryRun)status('Önizleme',true)};
   ws.onclose=()=>{for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('Bağlantı kesildi'))}pending.clear();resetLive();status(stopped?'Bağlantı kesildi':'Tekrar bağlanıyor');if(!stopped)retry=setTimeout(load,2000)};
   ws.onerror=()=>status('Bilgisayar aranıyor');
 }
@@ -104,7 +104,7 @@ function setupFullMouse(){
  globalMouse=new HoldMouse(gestureOptions({delay:(f,ms)=>setTimeout(f,ms),cancelDelay:id=>clearTimeout(id),activate:()=>{window.getSelection()?.removeAllRanges();suppressUntil=performance.now()+900;window.SofaNative?.vibrate?.()}}));
  const allowed=e=>fullMouse&&!$('#sheet').open&&!e.target.closest('.touchpad,#top-tabs,select,input[type=range],input[type=checkbox]');
  document.addEventListener('pointerdown',e=>{
-  if(!allowed(e))return;
+  if(!allowed(e)){suppressUntil=0;return;}
   if(e.cancelable)e.preventDefault();
   owners.set(e.pointerId,{scroll:e.target.closest('.favorites,.pane-content'),target:e.target.closest('button,a,summary,label,input,textarea,[contenteditable=true]')});
   globalMouse.down(e);
@@ -128,7 +128,7 @@ function setupFullMouse(){
  },{capture:true,passive:false});
  document.addEventListener('pointercancel',e=>{if(owners.has(e.pointerId)){owners.clear();globalMouse.reset()}},true);
  for(const name of ['contextmenu','selectstart','dragstart'])document.addEventListener(name,e=>{if(allowed(e)){e.preventDefault();e.stopImmediatePropagation()}},true);
- document.addEventListener('click',e=>{if(!replaying&&allowed(e)&&performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation()}},true);
+ document.addEventListener('click',e=>{if(!replaying&&performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation()}},true);
  document.body.classList.toggle('full-mouse',fullMouse);
 }
 
