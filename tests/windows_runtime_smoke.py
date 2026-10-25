@@ -22,6 +22,39 @@ def healthy(port):
     with urlopen(f'http://127.0.0.1:{port}/api/info',timeout=2) as r:return json.load(r)['service']=='sofa-remote'
 def kill_tree(pid):subprocess.run(['taskkill','/PID',str(pid),'/T','/F'],capture_output=True)
 
+def automatic_install_smoke():
+    import winreg
+    with tempfile.TemporaryDirectory(prefix="sofa install ' renamed ") as temp:
+        root=Path(temp);state=root/'SofaRemote';target=state/'bin'/'SofaRemote.exe'
+        env=dict(os.environ,LOCALAPPDATA=str(root))
+        try:
+            for name in ('Downloaded name (1).exe','Moved and renamed.exe'):
+                source=root/name;shutil.copy2('dist/SofaRemote.exe',source)
+                updates=state/'updates';updates.mkdir(parents=True,exist_ok=True)
+                (updates/'SofaRemote-0.1.0.exe').write_bytes(b'obsolete')
+                (updates/'SofaRemote-0.1.0.part').write_bytes(b'partial')
+                launcher=subprocess.Popen([str(source)],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+                launcher.wait(timeout=40)
+                assert launcher.returncode==0
+                wait(lambda:healthy(8765) and not source.exists())
+                wait(lambda:list(root.rglob('*.exe'))==[target])
+                assert not list(root.rglob('*.previous'))
+                with winreg.OpenKey(winreg.HKEY_CURRENT_USER,r'Software\Microsoft\Windows\CurrentVersion\Run') as key:
+                    assert str(state/'watchdog.ps1') in winreg.QueryValueEx(key,'SofaRemote')[0]
+                print('Automatic install: renamed download, canonical path, startup, previous process takeover and cleanup verified',flush=True)
+        except Exception:
+            for path in state.rglob('*.log'):
+                print(path.name,path.read_text(errors='replace')[-3000:],flush=True)
+            raise
+        finally:
+            (state/'watchdog.stop').write_text('stop')
+            cleanup="$root=$env:SOFA_CLEAN_ROOT; Get-CimInstance Win32_Process | Where-Object { ($_.ExecutablePath -and $_.ExecutablePath.StartsWith($root)) -or ($_.Name -eq 'powershell.exe' -and $_.CommandLine.Contains($root)) } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+            subprocess.run(['powershell.exe','-NoProfile','-Command',cleanup],env=dict(os.environ,SOFA_CLEAN_ROOT=str(root)),capture_output=True)
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER,r'Software\Microsoft\Windows\CurrentVersion\Run') as key:
+                try:winreg.DeleteValue(key,'SofaRemote')
+                except FileNotFoundError:pass
+            time.sleep(3)
+
 def main():
     with tempfile.TemporaryDirectory(prefix="sofa update ' space ") as temp:
         state=Path(temp);exe=state/'SofaRemote.exe';shutil.copy2('dist/UpdateFixture.exe',exe)
@@ -38,7 +71,7 @@ def main():
             data=json.loads((state/'started.json').read_text());assert data['phase']=='running'
             assert data['argv']==['--state',str(state),'--port',str(port)],data
             wait(lambda:'server healthy' in (state/'updates/update.log').read_text())
-            assert Path(str(exe)+'.previous').exists()
+            wait(lambda:not Path(str(exe)+'.previous').exists() and not list((state/'updates').glob('SofaRemote-*.exe')))
             print('Onefile update: unlocked, replaced, restarted, original arguments preserved')
         finally:
             kill_tree(process.pid)
@@ -66,4 +99,5 @@ def main():
             def remove_executable():
                 target.unlink(missing_ok=True);return True
             wait(remove_executable,seconds=20)
+    automatic_install_smoke()
 if __name__=='__main__':main()

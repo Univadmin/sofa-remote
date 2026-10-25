@@ -25,13 +25,9 @@ Ağ keşfi UDP 8766, kumanda bağlantısı TCP 8765 kullanır. Broadcast engelle
 
 ### Windows’ta otomatik açılış ve yeniden başlatma
 
-Eski Sofa Remote penceresini kapat. Yeni EXE’yi indir; dosyanın olduğu klasörde terminal açıp bir kez çalıştır:
+GitHub’dan EXE’yi indirip çift tıkla. Adını veya bulunduğu klasörü değiştirmiş olsan da uygulama kendini `%LOCALAPPDATA%\SofaRemote\bin\SofaRemote.exe` konumuna kurar. Çalışan eski sürümü devralır; yönetici izni veya terminal komutu gerekmez. Kurulum doğrulandıktan sonra çalıştırdığın indirme dosyası, eski EXE yedeği ve güncelleme paketleri otomatik silinir. Başka klasörlerde elle oluşturulmuş eski kopyalar aranmaz.
 
-```powershell
-.\SofaRemote.exe --install-startup
-```
-
-Yönetici izni gerekmez. Uygulama `%LOCALAPPDATA%\SofaRemote\bin\SofaRemote.exe` konumuna yerleşir ve arka planda açılır. Kullanıcının Windows oturumu açıldığında otomatik başlar. Uygulama çökerse veya kapatılırsa izleyici birkaç saniye sonra yeniden açar. Güncelleme sırasında izleyici bekler; güncelleme yardımcısı EXE’yi değiştirip yeniden başlatır. Bilgisayar kapalıyken veya Windows oturumu açılmadan çalışmaz; kilit ekranında giriş gönderilemez.
+Sonraki güncellemeler telefondaki Güncelleme menüsünden yapılır. Tek kurulu EXE yerinde güncellenir, yeniden açılır ve başarılı açılıştan sonra eski paketler temizlenir. Windows oturumu açıldığında otomatik başlar; çökerse veya kapatılırsa izleyici tekrar açar. Bilgisayar kapalıyken veya Windows oturumu açılmadan çalışmaz.
 
 Otomatik başlatmayı kapatmak için:
 

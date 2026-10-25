@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
     void openServer(String address){
         if(!Discovery.localUrl(address))return;showingDevices=false;failures=0;server=address;getPreferences(0).edit().putString("server",server).apply();
         if(web!=null)web.destroy();remoteEditor=null;keyboardBar=null;web=new WebView(this);web.setBackgroundColor(Color.rgb(16,19,27));
+        web.clearCache(true);web.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
         web.getSettings().setJavaScriptEnabled(true);web.getSettings().setDomStorageEnabled(true);web.getSettings().setAllowFileAccess(false);web.getSettings().setAllowContentAccess(false);web.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         web.setOnLongClickListener(v->true);web.setLongClickable(false);
         web.addJavascriptInterface(new NativeBridge(),"SofaNative");

@@ -5,6 +5,16 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 from server.updater import Updater
+from server.version import VERSION
+
+class ObsoletePackageTests(unittest.TestCase):
+    def test_cleanup_preserves_future_updates_and_unrelated_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            updater=Updater(tmp)
+            for name in (f'SofaRemote-{VERSION}.exe','SofaRemote-0.1.0.part','SofaRemote-99.0.0.exe','personal.exe'):
+                (updater.state/name).write_bytes(b'fixture')
+            updater.clean_obsolete()
+            self.assertEqual(sorted(p.name for p in updater.state.iterdir()),['SofaRemote-99.0.0.exe','personal.exe'])
 
 class Response:
     def __init__(self,data=None,body=b''):
@@ -54,11 +64,11 @@ class PowerShellSyntaxTests(unittest.TestCase):
     def test_runtime_scripts_parse_in_windows_powershell(self):
         import os
         import subprocess
-        from server.windows_runtime import UPDATE_SCRIPT,WATCH_SCRIPT
+        from server.windows_runtime import UPDATE_SCRIPT,WATCH_SCRIPT,INSTALL_SCRIPT
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'script.ps1'
             command="$tokens=$null; $errors=$null; [System.Management.Automation.Language.Parser]::ParseFile($env:SOFA_PARSE_SCRIPT,[ref]$tokens,[ref]$errors) | Out-Null; if($errors){$errors | Out-String | Write-Output; exit 1}"
-            for source in (UPDATE_SCRIPT,WATCH_SCRIPT):
+            for source in (UPDATE_SCRIPT,WATCH_SCRIPT,INSTALL_SCRIPT):
                 path.write_text(source,encoding='utf-8-sig')
                 result=subprocess.run(['powershell.exe','-NoProfile','-Command',command],env=dict(os.environ,SOFA_PARSE_SCRIPT=str(path)),capture_output=True,text=True)
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)

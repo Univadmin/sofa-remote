@@ -40,12 +40,32 @@ public class RemoteInteractionTest {
         }
     }
     @After public void captureResult()throws Exception{screenshot("interaction-"+SystemClock.uptimeMillis());}
-    private void hold(String selector)throws Exception{
+    private void hold(String selector)throws Exception{touch(selector,700);}
+    private void tap(String selector)throws Exception{touch(selector,80);}
+    private void touch(String selector,long duration)throws Exception{
         JSONArray point=new JSONArray(js("(()=>{const r=document.querySelector("+org.json.JSONObject.quote(selector)+").getBoundingClientRect();return [r.left+r.width/2,r.top+r.height/2]})()"));
         int[] origin=new int[2];float[] scale=new float[1];InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{web.getLocationOnScreen(origin);scale[0]=web.getScale();});
         float x=origin[0]+(float)point.getDouble(0)*scale[0],y=origin[1]+(float)point.getDouble(1)*scale[0];long start=SystemClock.uptimeMillis();
-        MotionEvent down=MotionEvent.obtain(start,start,MotionEvent.ACTION_DOWN,x,y,0);down.setSource(InputDevice.SOURCE_TOUCHSCREEN);InstrumentationRegistry.getInstrumentation().sendPointerSync(down);down.recycle();SystemClock.sleep(700);
+        MotionEvent down=MotionEvent.obtain(start,start,MotionEvent.ACTION_DOWN,x,y,0);down.setSource(InputDevice.SOURCE_TOUCHSCREEN);InstrumentationRegistry.getInstrumentation().sendPointerSync(down);down.recycle();SystemClock.sleep(duration);
         MotionEvent up=MotionEvent.obtain(start,SystemClock.uptimeMillis(),MotionEvent.ACTION_UP,x,y,0);up.setSource(InputDevice.SOURCE_TOUCHSCREEN);InstrumentationRegistry.getInstrumentation().sendPointerSync(up);up.recycle();
+    }
+    @Test public void footerMenusAndActionsWorkWithoutNativeDialog()throws Exception{
+        js("if(window.HTMLDialogElement)HTMLDialogElement.prototype.showModal=undefined;window.testChecks=0;const originalFetch=window.fetch;window.fetch=function(url,options){if(String(url).endsWith('/api/updates/check')){testChecks++;return Promise.resolve(new Response('{}',{status:200,headers:{'Content-Type':'application/json'}}));}return originalFetch.apply(this,arguments)};true");
+        for(boolean full:new boolean[]{false,true}){
+            js("fullMouse="+full+";document.body.classList.toggle('full-mouse',fullMouse);true");
+            tap("#layout");SystemClock.sleep(1100);
+            assertEquals("true",js("!document.querySelector('#sheet').hidden&&document.querySelector('#sheet-title').textContent==='Ekran ve mouse'"));
+            tap("#side");assertEquals("true",js("document.querySelector('#sheet').hidden&&document.querySelector('#workspace').classList.contains('side')"));
+            tap("#shortcuts");SystemClock.sleep(1100);
+            assertEquals("true",js("!document.querySelector('#sheet').hidden&&!!document.querySelector('#add-shortcut')"));
+            tap("#close-sheet");assertEquals("true",js("document.querySelector('#sheet').hidden"));
+            tap("#downloads");SystemClock.sleep(1100);
+            assertEquals("true",js("!document.querySelector('#sheet').hidden&&document.querySelector('#sheet-title').textContent==='Güncelleme'"));
+            tap("[data-check-updates]");
+            waitFor(()->"true".equals(js("testChecks>0&&!document.querySelector('[data-check-updates]').disabled")));
+            tap("#close-sheet");
+        }
+        assertEquals("2",js("testChecks"));
     }
     @Test public void longPressTextAndInputStartsMouseWithoutSelection()throws Exception{
         js("fullMouse=true;document.body.classList.add('full-mouse');true");

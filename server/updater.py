@@ -92,5 +92,27 @@ class Updater:
             self.status['state']='ready'
             pause.unlink(missing_ok=True);raise
     async def background(self):
-        while True:
-            await self.check();await asyncio.sleep(6*3600)
+        async def tidy():
+            # Let the update worker confirm health and finish rollback handling first.
+            await asyncio.sleep(45)
+            for _ in range(60):
+                if not (self.state/'installing').exists():
+                    self.clean_obsolete();return
+                await asyncio.sleep(5)
+        cleanup=asyncio.create_task(tidy())
+        try:
+            while True:
+                await self.check();await asyncio.sleep(6*3600)
+        finally:
+            cleanup.cancel();await asyncio.gather(cleanup,return_exceptions=True)
+
+    def clean_obsolete(self):
+        """Only remove known package names at or below the running version."""
+        for file in self.state.iterdir():
+            match=re.fullmatch(r'SofaRemote-(\d+\.\d+\.\d+)\.(exe|part)',file.name)
+            if match and version_tuple(match[1])<=version_tuple(VERSION):
+                try:file.unlink()
+                except OSError:pass
+        if os.name=='nt' and getattr(sys,'frozen',False):
+            try:Path(sys.executable+'.previous').unlink(missing_ok=True)
+            except OSError:pass

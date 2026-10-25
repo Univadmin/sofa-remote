@@ -321,6 +321,9 @@ def main():
     if args.install_startup or args.disable_startup:
         from .windows_runtime import configure_startup
         configure_startup(args.install_startup, STATE); return
+    if os.name=='nt' and getattr(sys,'frozen',False) and not args.dry_run:
+        from .windows_runtime import automatic_install
+        if automatic_install(STATE):return
     app=create_app(DryRun() if args.dry_run else None,state_dir=args.state_dir)
     app['remote'].updater.health_url=f'http://127.0.0.1:{args.port}/api/info'
     import ssl
