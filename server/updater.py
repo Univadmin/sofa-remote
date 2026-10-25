@@ -87,7 +87,7 @@ class Updater:
                 if process.poll() is not None:break
                 await asyncio.sleep(.1)
             process.terminate()
-            raise ValueError('Güncelleme yardımcısı başlayamadı; PC kumandası açık bırakıldı')
+            raise ValueError(f'Güncelleme yardımcısı başlayamadı (kod {process.poll()}); PC kumandası açık bırakıldı')
         except Exception:
             self.status['state']='ready'
             pause.unlink(missing_ok=True);raise

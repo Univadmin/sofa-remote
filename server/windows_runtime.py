@@ -91,10 +91,21 @@ try {
 
 def powershell(script, config):
     env=dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT='1')
-    with script.with_suffix('.launch.log').open('ab') as log:
-        return subprocess.Popen(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),str(config)],
-        cwd=str(script.parent),env=env,creationflags=0x00000008|0x00000200,
-        stdin=subprocess.DEVNULL,stdout=log,stderr=log,close_fds=True)
+    # Windows propagates PyInstaller's DLL search directory to child processes.
+    # External system tools must use Windows DLLs, not bundled application DLLs.
+    kernel=None
+    if os.name=='nt' and getattr(sys,'frozen',False):
+        import ctypes
+        kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+        kernel.SetDllDirectoryW.argtypes=[ctypes.c_wchar_p]
+        kernel.SetDllDirectoryW(None)
+    try:
+        with script.with_suffix('.launch.log').open('ab') as log:
+            return subprocess.Popen(['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(script),str(config)],
+                cwd=str(script.parent),env=env,creationflags=0x00000200|0x08000000,
+                stdin=subprocess.DEVNULL,stdout=log,stderr=log,close_fds=True)
+    finally:
+        if kernel:kernel.SetDllDirectoryW(getattr(sys,'_MEIPASS',None))
 
 def configure_startup(enabled, state):
     if os.name!='nt' or not getattr(sys,'frozen',False):raise ValueError('Paketli Windows EXE gereklidir')
