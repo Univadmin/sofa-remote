@@ -35,6 +35,7 @@ async def main():
         else:
             source='trailer' if path=='/info' else 'movie'
             body=f'<h1>Fixture Movie</h1><video controls muted preload="auto" style="width:320px" src="/{source}.webm"><track default kind="subtitles" srclang="tr" src="/sub.vtt"></video>'
+        if path=='/lazy-frame':body='<div class="play-that-video" aria-label="Play video">Oynat</div><iframe data-src="http://127.0.0.1:8767/inner"></iframe><script>document.querySelector(".play-that-video").onclick=()=>{const f=document.querySelector("iframe");f.src=f.dataset.src;document.querySelector(".play-that-video").remove()}</script>'
         if path=='/lazy':body=body.replace('preload="auto"','preload="none"')
         if path=='/turkish':body=body.replace('<track default kind="subtitles" srclang="tr" src="/sub.vtt">','')
         if path=='/custom':
@@ -53,9 +54,9 @@ async def main():
         return web.Response(text=f'<!doctype html><title>{title}</title>{body}',content_type='text/html')
     app=web.Application();app.router.add_get('/api/browser',browser);app.router.add_get('/{path:.*}',page)
     runner=web.AppRunner(app);await runner.setup();await web.TCPSite(runner,'127.0.0.1',8765).start();await web.TCPSite(runner,'127.0.0.1',8767).start()
-    async def command(kind,path,timeout=12000,turkish=False):
+    async def command(kind,path,timeout=12000,turkish=False,passive=False):
         ident=str(len(pending)+1);future=asyncio.get_running_loop().create_future();pending[ident]=future
-        await socket.send_json({'type':kind,'requestId':ident,'url':'http://127.0.0.1:8765'+path,'movie':{'title':'Fixture Movie','original_title':'Fixture Movie','runtime':20,'turkish_original':turkish},'turkish_subtitles':False,'timeout':timeout})
+        await socket.send_json({'type':kind,'requestId':ident,'url':'http://127.0.0.1:8765'+path,'movie':{'title':'Fixture Movie','original_title':'Fixture Movie','runtime':20,'turkish_original':turkish},'turkish_subtitles':False,'timeout':timeout,'passive':passive})
         if path=='/nested' and os.environ.get('SOFA_DEBUG'):
             await asyncio.sleep(4)
             for p in context.pages:
@@ -76,6 +77,19 @@ async def main():
                 if os.environ.get('SOFA_NESTED_ONLY'):
                     print(await command('movie-probe','/nested'),flush=True);await context.close();return
                 initial=len(context.pages)
+                for path in ('/movie','/lazy-frame','/nested'):
+                    result=await command('movie-probe',path,passive=True)
+                    assert result.get('status')=='ready', (path,result)
+                    assert result.get('turkish_subtitles') and result['duration']>=1200
+                    assert len(context.pages)==initial
+                    print('Real Chromium: passive metadata + subtitle readiness '+path,flush=True)
+                result=await command('movie-probe','/blocked',3000,passive=True)
+                assert result.get('status')=='region_unavailable',result
+                result=await command('movie-probe','/turkish',3000,passive=True)
+                assert result.get('status')=='subtitles_unknown',result
+                result=await command('movie-probe','/info',3000,passive=True)
+                assert result.get('status')=='trailer',result
+                print('Real Chromium: passive region, subtitle and trailer diagnoses distinguished',flush=True)
                 result=await command('movie-probe','/movie');assert result.get('ok'),result
                 assert result['duration']>=1200 and result['turkish_subtitles'];assert len(context.pages)==initial
                 print('Real Chromium: advancing full-length video verified; silent probe tab closed',flush=True)

@@ -227,7 +227,10 @@ async def browser_handler(request):
                         attempted.add(identity)
                         await ws.send_json({'type':'extension-reload','version':target})
                 elif data.get('type')=='movie-capabilities':
-                    r.movie_capable=data.get('version')==2
+                    r.movie_capable=data.get('version')==3
+                elif data.get('type')=='movie-search-results':
+                    callback=r.playback.discoveries.get(data.get('requestId'))
+                    if callback and isinstance(data.get('links'),list):callback(data['links'][:40])
                 elif data.get('type')=='movie-gesture':
                     ident=data.get('requestId')
                     if ident in r.playback.gestures:
@@ -302,6 +305,7 @@ async def movies(request):
             await r.playback.reset()
             return web.json_response({'ok':True})
         if action=='mark':catalog.mark(ident,data.get('status'));return web.json_response({'ok':True})
+        if action=='open_source':return web.json_response(await r.playback.open_source(ident,data.get('source_id')))
         if action in ('open','play','fallback'):
             return web.json_response(await r.playback.play(ident,data.get('source_id')))
         raise ValueError('Geçersiz film işlemi')

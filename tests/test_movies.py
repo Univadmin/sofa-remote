@@ -84,7 +84,7 @@ class MovieApiTests(unittest.IsolatedAsyncioTestCase):
     async def test_only_authorized_playback_can_request_one_trusted_key(self):
         import asyncio
         await self.client.post('/api/connect');browser=await self.client.ws_connect('/api/browser')
-        await browser.send_json({'type':'movie-capabilities','version':2});await asyncio.sleep(.01)
+        await browser.send_json({'type':'movie-capabilities','version':3});await asyncio.sleep(.01)
         remote=self.app['remote'];task=asyncio.create_task(remote.playback.command('movie-play',url='https://example.com/movie',movie=NODE['content']))
         command=await browser.receive_json()
         for ident in ('unrelated',command['requestId'],command['requestId']):await browser.send_json({'type':'movie-gesture','requestId':ident})

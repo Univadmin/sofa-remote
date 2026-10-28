@@ -112,3 +112,24 @@ sonrasında eklentinin Yenile düğmesine bir kez basın. Sonraki sürümlerde
 bağlantı yeniden kurulduğunda eklenti otomatik yeniden yüklenir.
 Açık sayfalardaki içerik betiklerinin yenilenmesi için ilgili sayfayı uygun
 bir zamanda yenileyin; film oynatan sekmeler otomatik yenilenmez.
+
+### Film kaynağı araması (v0.4.5)
+
+Seçilen film Türkçe, İngilizce ve özgün adıyla aranır. Türkiye platform
+kataloğu, web araması ve PC tarayıcısındaki arama birbirinden bağımsızdır;
+birinin erişim hatası diğerlerini durdurmaz. Hdfilmcehennemi'nin normal
+arama ekranı da kontrol edilir. Aramalar en fazla 75 saniye sürer; bulunan
+kaynaklar sırayla ekrana gelir. Yeniden kontrol önbelleği tazeler.
+
+“Video hazır” tam film süresine uygun video ve görüntü verisinin yüklenmesini
+ifade eder, oynatım garantisi değildir. Arama sırasında PC'ye oynat tuşu
+gönderilmez, tam ekran açılmaz. Gecikmeli oynatıcı/iframe yüklenebilir;
+kontrol sekmeleri sessizdir ve kapanır. “Oynatım doğrulandı” ayrı bir durumdur.
+Bölge engeli, yüklenmeyen oynatıcı, hesap gereksinimi ve doğrulanamayan
+Türkçe altyazı ayrı gösterilir. CAPTCHA otomatik geçilmez. Arama engelleri
+“film yok” sayılmaz; Arama tanısı altında görünür. Bilgi siteleri ve yanlış
+yıl/fragman sonuçları hazır kaynaklara eklenmez.
+
+Kaynağı PC'de açmak veya Oynatmayı dene düğmesine basmak kullanıcıya aittir.
+Yabancı filmlerde Türkçe altyazı gerekir; Türkçe özgün film seçeneği bu koşulu
+kaldırır. Üyelik, bölge ve oynatıcı durumları mevcut PC oturumuna bağlıdır.

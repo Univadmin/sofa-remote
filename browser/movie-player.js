@@ -1,13 +1,14 @@
 /* Playback checks run only on tabs explicitly opened by a film command. */
 'use strict';
 (()=>{
- let control=null,timer=null,selected=null,firstPosition=null,advances=0,reported=false,armed=false,clickedPlay=false,bridgeSubtitles=false,bridgeContainer=null,gestureRequested=false,waitingReason="",startedAt=0;const prepared=new WeakMap();const styles=new Map();
+ let control=null,timer=null,selected=null,firstPosition=null,advances=0,reported=false,armed=false,clickedPlay=false,bridgeSubtitles=false,bridgeContainer=null,gestureRequested=false,waitingReason="",startedAt=0;const prepared=new WeakMap();const styles=new Map();const failedResources=new Set();
+ window.addEventListener('error',e=>{if(e.target?.tagName==='SCRIPT')failedResources.add('script');},true);
  const norm=s=>String(s||'').toLocaleLowerCase('tr').replace(/ı/g,'i').normalize('NFKD').replace(/[^\p{L}\p{N}]/gu,'');
  const unavailable=/bu (?:video|içerik|yapım) (?:şu anda )?(?:kullanılamıyor|izlenemiyor|mevcut değil)|ülkenizde (?:mevcut|kullanılabilir) değil|bulunduğunuz (?:bölgede|konumda).*?(?:mevcut değil|izlenemiyor)|not available in your (?:country|region|location)|this (?:video|title|content) is (?:currently )?(?:unavailable|not available)|video unavailable/i;
  function signal(state,extra={}){chrome.runtime.sendMessage({type:'movie-state',requestId:control.requestId,state,...extra}).catch(()=>{})}
  function restore(){for(const [el,value] of styles){if(value===null)el.removeAttribute('style');else el.setAttribute('style',value)}styles.clear();}
  function bridge(action){if(control)window.postMessage({type:'sofa-player-command',requestId:control.requestId,action,mode:control.mode},'*')}
- function waiting(reason){if(waitingReason===reason)return;waitingReason=reason;signal('waiting',{reason})}
+ function waiting(reason,code='unconfirmed'){if(waitingReason===reason)return;waitingReason=reason;signal('waiting',{reason,code,videoFound:videos().length>0})}
  function gesture(target){if(gestureRequested)return;gestureRequested=true;armed=true;selected=target||selected;signal('gesture-needed')}
  function stop(){restore();clearInterval(timer);timer=null;armed=false;control=null;selected=null;}
  function finish(state,extra={}){if(reported||!control)return;reported=true;signal(state,extra);if(control.mode==='probe')selected?.pause();clearInterval(timer);timer=null;armed=false;}
@@ -17,7 +18,7 @@
   const seconds=Number(control.movie.runtime)*60;
   if(seconds>0&&(video.duration<seconds*.75||video.duration>seconds*1.3))return false;
   const title=norm(navigator.mediaSession?.metadata?.title||document.title);
-  return control.titleConfirmed||[control.movie.title,control.movie.original_title].some(n=>{const name=norm(n);return name&&(name.length>=4?title.includes(name):title===name)});
+  return control.titleConfirmed||[control.movie.title,control.movie.english_title,control.movie.original_title].some(n=>{const name=norm(n);return name&&(name.length>=4?title.includes(name):title===name)});
  }
  function expand(element){
   if(!styles.has(element))styles.set(element,element.getAttribute('style'));
@@ -52,12 +53,49 @@
   }else selected?.click();
   bridge('gesture');
  },true);
+ function loadLazyPlayer(){
+  if(!control.titleConfirmed)return;
+  for(const f of document.querySelectorAll('.player-container iframe[data-src],.video-container iframe[data-src],.player-container iframe[data-lazy-src]')){
+   if(f.getAttribute('src')||f.dataset.sofaLoaded)continue;
+   try{const u=new URL(f.dataset.src||f.dataset.lazySrc,location.href);
+    if(u.protocol!=='https:'||/^(localhost|[\d.]+)$/.test(u.hostname)||/\.(local|localhost|lan|internal)$/.test(u.hostname)||u.hostname.includes(':')||u.username||u.password||!/(embed|player|video)/i.test(u.pathname))continue;
+    f.dataset.sofaLoaded='1';f.src=u.href;
+   }catch{}
+  }
+ }
+ function passiveTick(all){
+  bridge('inspect');
+  if(control.titleConfirmed&&!all.length&&!clickedPlay){const launch=document.querySelector('.play-that-video[aria-label="Play video"]');if(launch){clickedPlay=true;launch.click();}}
+  for(const v of all)if(!prepared.has(v)){prepared.set(v,Date.now());v.preload='auto';}
+  loadLazyPlayer();
+  const candidates=all.filter(matches);const v=candidates.find(v=>v.readyState>=2&&!v.error)||candidates[0];
+  if(!v){
+   const failed=all.find(v=>v.error);
+   if(failed)return finish('unavailable',{reason:'Video kaynağı yüklenemedi (ağ, biçim veya sunucu hatası)',code:'media_error'});
+   const text=document.body?.innerText||'';
+   if(/sign in to watch|log in to watch|izlemek için (?:giriş|oturum)|üyeli[kğ]|abone ol|subscribe to watch/i.test(text))waiting('Hesap/abonelik veya kullanıcı etkileşimi gerekiyor; oynatım doğrulanamadı','account_required');
+   else if(all.some(v=>Number.isFinite(v.duration)&&v.duration>0&&v.duration<1200))waiting('Kısa video/fragman var; tam film doğrulanamadı','trailer');
+   else if(!all.length&&document.querySelector('.player-container iframe,.video-container iframe'))waiting('Film sayfası ve gömülü oynatıcı bulundu; oynatıcıdan video verisi alınamadı (erişim, site koruması veya etkileşim gerekebilir)','player_not_loaded');
+   else if(!all.length&&failedResources.size)waiting('Sayfa bulundu ancak oynatıcı JavaScript dosyaları yüklenemedi; site erişimi/koruması kontrol edilmeli','resource_error');
+   else waiting(all.length?'Video öğesi var; süre/veri yüklenmedi. Oynat düğmesi veya ağ erişimi gerekebilir':'Sayfa açıldı; yüklenmiş tam film videosu bulunamadı','interaction_required');
+   return;
+  }
+  selected=v;
+  if(v.error)return finish('unavailable',{reason:'Video kaynağı oynatılamıyor',code:'media_error'});
+  const tr=[...v.textTracks].some(t=>/^tr(?:-|$)|^tur$/i.test(t.language)||/^(türkçe|turkce|turkish)$/i.test(t.label));
+  const subtitle=tr||bridgeSubtitles;
+  if(!control.movie.turkish_original&&!subtitle){waiting('Tam film oynatıcısı bulundu; Türkçe altyazı doğrulanamadı','subtitles_unknown');return;}
+  if(v.readyState<2){waiting('Film süresi bulundu ancak görüntü verisi yüklenmedi','media_pending');return;}
+  // Loaded frames prove readiness, not future playback or account entitlement.
+  finish('ready',{duration:v.duration,turkish_subtitles:subtitle,status:'ready',evidence:'loaded_video',reason:'Film süresi ve görüntü verisi yüklendi; oynatma başlatılmadı'});
+ }
  function tick(){
   if(!control||reported)return;
   const alerts=[...document.querySelectorAll('[role="alert"],.error-message,.player-error,[data-uia*="error"]')].map(e=>e.innerText||'').join(' ');
   const bodyText=document.body?.innerText||'';
-  if(unavailable.test(alerts)||window===window.top&&bodyText.length<2500&&unavailable.test(bodyText))return finish('unavailable',{reason:'Bu video mevcut oturumda veya bölgede kullanılamıyor'});
+  if(unavailable.test(alerts)||window===window.top&&bodyText.length<2500&&unavailable.test(bodyText))return finish('unavailable',{reason:'Bu video mevcut oturumda veya bölgede kullanılamıyor',code:'region_unavailable'});
   const all=videos();
+  if(control.passive)return passiveTick(all);
   // Never call load(): resetting a MediaSource/DRM player can detach its source buffers.
   if(control.titleConfirmed){
    bridge('start');
@@ -106,3 +144,22 @@
   timer=setInterval(tick,500);tick();
  });
 })();
+
+// Only explicitly requested search tabs report links; normal browsing is untouched.
+let sofaSearchRequest=null;
+chrome.runtime.onMessage.addListener(message=>{
+ if(message.type!=='movie-search-control'||window!==window.top)return;
+ const host=location.hostname;
+ if(!['www.google.com','www.bing.com','www.hdfilmcehennemi.nl'].includes(host))return;
+ if(host==='www.hdfilmcehennemi.nl'&&sofaSearchRequest!==message.requestId){
+  const input=document.querySelector('input[aria-label="Search input"]');
+  if(input){input.value=String(message.query||'');input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new KeyboardEvent('keyup',{bubbles:true,key:'Enter'}));sofaSearchRequest=message.requestId;}
+ }
+ const links=[];
+ for(const a of document.querySelectorAll(host.includes('google')?'a:has(h3)':host.includes('bing')?'li.b_algo h2 a':'a[href]')){
+  const title=(a.innerText||a.textContent||a.querySelector('img')?.alt||'').slice(0,300);
+  if(a.href&&(!host.includes('hdfilmcehennemi')||title.toLocaleLowerCase('tr').includes(String(message.query||'').toLocaleLowerCase('tr'))))links.push({url:a.href,title});
+ }
+ if(links.length)chrome.runtime.sendMessage({type:'movie-search-result',links:links.slice(0,20)}).catch(()=>{});
+ else if(/unusual traffic|captcha|olağan dışı trafik|verify you are human|insan olduğunuzu/i.test(document.body?.innerText||''))chrome.runtime.sendMessage({type:'movie-search-result',links:[],error:'Arama motoru insan doğrulaması istiyor; otomatik geçilmedi'}).catch(()=>{});
+});

@@ -13,7 +13,7 @@ from html.parser import HTMLParser
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from .icons import PublicResolver
 
-FIELDS='id content(country:TR,language:tr){title originalTitle originalReleaseYear fullPath runtime scoring{imdbScore imdbVotes} externalIds{imdbId}}'
+FIELDS='id content(country:TR,language:tr){title originalTitle originalReleaseYear fullPath runtime scoring{imdbScore imdbVotes} externalIds{imdbId}} english:content(country:TR,language:en){title}'
 SEARCH='query($q:String!,$after:String){popularTitles(country:TR,first:24,after:$after,sortBy:POPULAR,filter:{searchQuery:$q,objectTypes:[MOVIE]}){pageInfo{endCursor hasNextPage} edges{node{'+FIELDS+'}}}}'
 DETAIL='query($id:ID!){node(id:$id){... on Movie{'+FIELDS+' offers(country:TR,platform:WEB){standardWebURL monetizationType subtitleLanguages package{clearName technicalName}}}}}'
 KINDS={'FREE':'Ücretsiz','ADS':'Reklamlı','FLATRATE':'Abonelik','RENT':'Kirala','BUY':'Satın al'}
@@ -55,6 +55,7 @@ def normalized(value):
 def movie_row(node):
     c=node['content'];score=(c.get('scoring') or {}).get('imdbScore')
     return {'id':node['id'],'title':c['title'],'original_title':c.get('originalTitle') or c['title'],
+        'english_title':(node.get('english') or {}).get('title') or c.get('originalTitle') or c['title'],
         'year':c.get('originalReleaseYear'),'imdb':score,'imdb_votes':(c.get('scoring') or {}).get('imdbVotes'),
         'runtime':c.get('runtime'),'source':'https://www.justwatch.com'+c['fullPath']}
 
@@ -155,7 +156,7 @@ class Movies:
         if duration<1200 or not 0<=position<=duration:return # trailers never count
         host=urlsplit(url).hostname or '';allowed=session['host']
         if host!=allowed and not host.endswith('.'+allowed):return
-        movie=session['movie'];names=(normalized(movie['title']),normalized(movie['original_title']))
+        movie=session['movie'];names=tuple(normalized(movie.get(k) or '') for k in ('title','english_title','original_title'))
         runtime=movie.get('runtime')
         if type(runtime) in (int,float) and runtime>0 and not runtime*60*.75<=duration<=runtime*60*1.3:return
         if not any(len(name)>=4 and name in normalized(title) for name in names):return
@@ -191,28 +192,16 @@ class Movies:
                     if len(raw)>500000:raise ValueError('Sayfa çok büyük')
                 return raw.decode(response.charset or 'utf-8',errors='replace'),url
         raise ValueError('Çok fazla yönlendirme')
-    async def fallback(self,ident):
+    async def fallback(self,ident,force=False):
+        from .movie_search import web_candidates
         movie=self.get(ident);key=('fallback',ident);cached=self.cache.get(key)
-        if cached and cached[0]>time.time():return cached[1]
-        query=f'{movie["title"]} {movie["year"] or ""} '+('film izle' if movie.get('turkish_original') else 'Türkçe altyazılı izle')
-        async with ClientSession(connector=TCPConnector(resolver=PublicResolver()),timeout=ClientTimeout(total=5,connect=2),headers={'User-Agent':'Mozilla/5.0 SofaRemote movie discovery'}) as client:
-            try:
-                html,_=await self.public_html(client,'https://html.duckduckgo.com/html/?q='+quote_plus(query))
-                parser=SearchLinks();parser.feed(html);urls=list(dict.fromkeys(parser.urls))[:12]
-            except Exception:urls=[]
-            slots=asyncio.Semaphore(4)
-            async def inspect(url):
-                try:
-                    async with slots:html,final=await self.public_html(client,url);page=FilmPage();page.feed(html)
-                    title=normalized(' '.join(page.text));matched=any(len(n)>=4 and n in title for n in (normalized(movie['title']),normalized(movie['original_title'])))
-                    from .playback import video_candidate
-                    if not matched or not page.player or not video_candidate(final):return None
-                    return {'url':final,'provider':urlsplit(final).hostname,'cost':'Site koşulları bilinmiyor','kind':'UNKNOWN',
-                        'turkish_subtitles':page.turkish and page.player,'unverified':True,'languages_known':page.turkish}
-                except Exception:return None
-            offers=[o for o in await asyncio.gather(*(inspect(url) for url in urls)) if o][:5]
-        result={'offers':offers,'search_url':self.web_search(ident)};self.cache[key]=(time.time()+600,result)
+        if not force and cached and cached[0]>time.time():return cached[1]
+        async with ClientSession(connector=TCPConnector(resolver=PublicResolver()),timeout=ClientTimeout(total=7,connect=3),headers={'User-Agent':'Mozilla/5.0'}) as client:
+            result=await web_candidates(self,movie,client)
+        result['search_url']=self.web_search(ident)
+        # Never retain an empty result after a search outage.
+        if result['offers']:self.cache[key]=(time.time()+300,result)
         return result
     def web_search(self,ident):
         movie=self.get(ident)
-        return 'https://www.google.com/search?q='+quote_plus(f'{movie["title"]} {movie["year"] or ""} Türkçe altyazılı izle')
+        return 'https://www.google.com/search?q='+quote_plus(f'{movie["title"]} {movie["original_title"]} {movie["year"] or ""} '+('film izle' if movie.get('turkish_original') else 'Türkçe altyazılı izle'))
