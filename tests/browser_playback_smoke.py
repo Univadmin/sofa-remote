@@ -77,7 +77,7 @@ async def main():
                 if os.environ.get('SOFA_NESTED_ONLY'):
                     print(await command('movie-probe','/nested'),flush=True);await context.close();return
                 initial=len(context.pages)
-                for path in ('/movie','/lazy-frame','/nested'):
+                for path in ('/movie','/lazy-frame','/nested','/jw','/playerjs'):
                     result=await command('movie-probe',path,passive=True)
                     assert result.get('status')=='ready', (path,result)
                     assert result.get('turkish_subtitles') and result['duration']>=1200

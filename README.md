@@ -124,7 +124,7 @@ kaynaklar sırayla ekrana gelir. Yeniden kontrol önbelleği tazeler.
 “Video hazır” tam film süresine uygun video ve görüntü verisinin yüklenmesini
 ifade eder, oynatım garantisi değildir. Arama sırasında PC'ye oynat tuşu
 gönderilmez, tam ekran açılmaz. Gecikmeli oynatıcı/iframe yüklenebilir;
-kontrol sekmeleri sessizdir ve kapanır. “Oynatım doğrulandı” ayrı bir durumdur.
+gereken oynatıcılar sessiz arka planda başlatılarak yüklenir; kontrol sekmeleri kapanır. “Oynatım doğrulandı” ayrı bir durumdur.
 Bölge engeli, yüklenmeyen oynatıcı, hesap gereksinimi ve doğrulanamayan
 Türkçe altyazı ayrı gösterilir. CAPTCHA otomatik geçilmez. Arama engelleri
 “film yok” sayılmaz; Arama tanısı altında görünür. Bilgi siteleri ve yanlış

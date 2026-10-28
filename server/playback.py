@@ -50,7 +50,7 @@ class Playback:
         if force and hasattr(self.remote.movies,'cache'):
             for key in (('detail',ident),('fallback',ident)):self.remote.movies.cache.pop(key,None)
         if job and (job['state']=='checking' or not force and time.time()-job['checked']<600):return {**job,'offers':list(job['offers'])}
-        job={'movie':movie,'state':'checking','offers':[],'candidates':[],'diagnostics':[],'queries':[],'checked':time.time(),'attempted':0,'discovered':0,'failures':[],'message':'Türkçe ve özgün/İngilizce adlarla kaynaklar aranıyor; film otomatik başlatılmaz.'};self.jobs[ident]=job
+        job={'movie':movie,'state':'checking','offers':[],'candidates':[],'diagnostics':[],'queries':[],'checked':time.time(),'attempted':0,'discovered':0,'failures':[],'message':'Türkçe ve özgün/İngilizce adlarla kaynaklar aranıyor; TV’de otomatik tam ekran açılmaz.'};self.jobs[ident]=job
         task=asyncio.create_task(self.check(ident,job));self.workers[ident]=task
         return {**job,'offers':[]}
     async def check(self,ident,job):
@@ -124,7 +124,7 @@ class Playback:
                 job['candidates'].append({**offer,'source_id':secrets.token_urlsafe(12),'status':'unconfirmed','reason':'Süre sınırı nedeniyle henüz incelenmedi.'})
             job['checked']=time.time()
             job['diagnostics']=list(dict.fromkeys(job['diagnostics']))
-            if job['offers']:job['message']=f"{len(job['offers'])} kaynakta tam film videosu hazır. Film başlatılmadı; yükleme kanıtı oynatım garantisi değildir."
+            if job['offers']:job['message']=f"{len(job['offers'])} kaynakta tam film videosu hazır. Sessiz arka plan kontrolü tamamlandı; yükleme kanıtı oynatım garantisi değildir."
             elif job['candidates']:job['message']='Film sayfaları bulundu; mevcut oturumda oynatılabilirlik/altyazı kesinleşmedi. Aşağıda her kaynağın nedeni var.'
             else:job['message']='Aramalarda doğrulanabilir film kaynağı elde edilemedi. Bu, filmin internette bulunmadığı anlamına gelmez; arama tanısını kontrol edin.'
 

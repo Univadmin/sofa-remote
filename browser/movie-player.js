@@ -65,6 +65,9 @@
  }
  function passiveTick(all){
   bridge('inspect');
+  // Some players create their media only after their public play API is called.
+  // A muted background initialization never requests a PC key or fullscreen.
+  if(control.titleConfirmed&&Date.now()-startedAt>2500)bridge('start');
   if(control.titleConfirmed&&!all.length&&!clickedPlay){const launch=document.querySelector('.play-that-video[aria-label="Play video"]');if(launch){clickedPlay=true;launch.click();}}
   for(const v of all)if(!prepared.has(v)){prepared.set(v,Date.now());v.preload='auto';}
   loadLazyPlayer();
@@ -87,7 +90,7 @@
   if(!control.movie.turkish_original&&!subtitle){waiting('Tam film oynatıcısı bulundu; Türkçe altyazı doğrulanamadı','subtitles_unknown');return;}
   if(v.readyState<2){waiting('Film süresi bulundu ancak görüntü verisi yüklenmedi','media_pending');return;}
   // Loaded frames prove readiness, not future playback or account entitlement.
-  finish('ready',{duration:v.duration,turkish_subtitles:subtitle,status:'ready',evidence:'loaded_video',reason:'Film süresi ve görüntü verisi yüklendi; oynatma başlatılmadı'});
+  finish('ready',{duration:v.duration,turkish_subtitles:subtitle,status:'ready',evidence:'loaded_video',reason:'Film süresi ve görüntü verisi yüklendi; sessiz arka plan kontrolü tamamlandı'});
  }
  function tick(){
   if(!control||reported)return;
