@@ -219,7 +219,14 @@ async def browser_handler(request):
             if msg.type!=WSMsgType.TEXT:continue
             try:
                 data=json.loads(msg.data)
-                if data.get('type')=='movie-capabilities':
+                if data.get('type')=='extension-version':
+                    target=request.app.get('browser_version')
+                    identity=str(data.get('id',''))[:100]
+                    attempted=request.app.setdefault('browser_reload_attempts',set())
+                    if target and data.get('version')!=target and identity not in attempted:
+                        attempted.add(identity)
+                        await ws.send_json({'type':'extension-reload','version':target})
+                elif data.get('type')=='movie-capabilities':
                     r.movie_capable=data.get('version')==2
                 elif data.get('type')=='movie-gesture':
                     ident=data.get('requestId')
@@ -372,6 +379,9 @@ def main():
         from .windows_runtime import automatic_install
         if automatic_install(STATE):return
     app=create_app(DryRun() if args.dry_run else None,state_dir=args.state_dir)
+    if os.name=='nt' and getattr(sys,'frozen',False):
+        from .browser_install import install_browser
+        app['browser_version']=install_browser(ROOT/'browser',Path(args.state_dir) if args.state_dir else STATE)
     app['remote'].updater.health_url=f'http://127.0.0.1:{args.port}/api/info'
     import ssl
     context=None

@@ -15,3 +15,11 @@ test('new film tab returns its actual tab ID for playback tracking',async()=>{
  await Socket.instance.onmessage({data:JSON.stringify({type:'tab',action:'new',url:'https://www.netflix.com/watch/1',requestId:'film-1'})});
  assert.deepEqual(messages[0],{requestId:'film-1',ok:true,tabId:202});
 });
+test('extension reloads for a changed deployed version, not the current version',async()=>{
+ const event={addListener(){}};let reloads=0;
+ class Socket{constructor(){this.readyState=1;this.send=()=>{};Socket.instance=this;}}
+ const chrome={tabs:{onActivated:event,onUpdated:event,onRemoved:event,onCreated:event},windows:{onFocusChanged:event},runtime:{onMessage:event,getManifest:()=>({version:'0.4.4'}),reload:()=>reloads++},alarms:{create(){},onAlarm:event}};
+ vm.runInNewContext(fs.readFileSync('browser/background.js','utf8'),{chrome,WebSocket:Socket,setTimeout(){},setInterval(){}});
+ for(const version of ['0.4.4','bad','0.4.5'])await Socket.instance.onmessage({data:JSON.stringify({type:'extension-reload',version})});
+ assert.equal(reloads,1);
+});

@@ -101,3 +101,14 @@ Diğer siteler için anahtarsız web aramasında en fazla 12 HTTPS sayfa incelen
 Film açılması yalnızca İzleniyor kaydı oluşturur. Güncel tarayıcı eklentisi film başlığı, süre ve gerçek oynatım ilerlemesini eşleştirip en az %90 izleme algılarsa İzlendi kaydı oluşturur; sayfada geçen süre veya ileri sarma yeterli değildir. Korumalı/özel oynatıcılarda algılama çalışmayabilir; elle işaretleme ve geri alma vardır. Geçmiş PC’de movies.sqlite3 dosyasında tutulur, telefonlar arasında ortaktır. İzleme durumu yayın platformlarının hesaplarına yazılmaz.
 
 Veri kaynağı: [JustWatch Türkiye](https://www.justwatch.com/tr). IMDb puanı kaynaktaki IMDb alanıdır; başka bir puan IMDb diye gösterilmez. Katalog herkese açık web arayüzünü kullanır; sağlayıcı değişiklikleri erişimi etkileyebilir.
+
+### Brave eklentisinin otomatik güncellenmesi (v0.4.4)
+
+Windows EXE, kendi paketindeki eklentiyi `%LOCALAPPDATA%\SofaRemote\browser`
+klasörüne kurar ve her Windows sürüm güncellemesinde bu klasörü yeniler.
+Brave'de `brave://extensions` → Geliştirici modu → Paketlenmemiş öğe yükle
+ile bu klasörü bir kez seçin. Önceki sürümden geçerken Windows güncellemesi
+sonrasında eklentinin Yenile düğmesine bir kez basın. Sonraki sürümlerde
+bağlantı yeniden kurulduğunda eklenti otomatik yeniden yüklenir.
+Açık sayfalardaki içerik betiklerinin yenilenmesi için ilgili sayfayı uygun
+bir zamanda yenileyin; film oynatan sekmeler otomatik yenilenmez.
