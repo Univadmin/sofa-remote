@@ -10,6 +10,14 @@ from server.network import local_address
 from server.updater import version_tuple, trusted_download
 
 class ValidationTests(unittest.TestCase):
+    def test_web_and_package_versions_match_server(self):
+        import json
+        from pathlib import Path
+        root=Path(__file__).resolve().parents[1]
+        self.assertIn("d.version!=='"+VERSION+"'",(root/'web/app.js').read_text())
+        self.assertEqual(json.loads((root/'browser/manifest.json').read_text())['version'],VERSION)
+        self.assertIn("versionName '"+VERSION+"'",(root/'android/app/build.gradle').read_text())
+
     def test_url_restrictions(self):
         for url in ['file:///secret','javascript:alert(1)','https://user:pass@example.com','cmd.exe',None]:
             with self.assertRaises(ValueError): validate_url(url)

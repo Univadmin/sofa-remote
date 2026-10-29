@@ -86,7 +86,7 @@ class Remote:
         self.updater=Updater(self.state)
         self.icons=Icons()
         self.movies=Movies(self.state)
-        self.movie_capable=False;self.playback=Playback(self)
+        self.movie_capable=False;self.browser_version=None;self.playback=Playback(self)
     def token(self):
         token=secrets.token_urlsafe(32); self.tokens[token]=time.monotonic()+24*3600; return token
     def authorized(self, token): return self.tokens.get(token,0)>time.monotonic()
@@ -212,7 +212,7 @@ async def browser_handler(request):
     r=request.app['remote'];ws=web.WebSocketResponse(heartbeat=20,max_msg_size=2500000)
     await ws.prepare(request)
     if r.browser is not None: await r.browser.close()
-    await r.playback.reset();r.movie_capable=False
+    await r.playback.reset();r.movie_capable=False;r.browser_version=None
     r.browser=ws
     try:
         async for msg in ws:
@@ -220,6 +220,7 @@ async def browser_handler(request):
             try:
                 data=json.loads(msg.data)
                 if data.get('type')=='extension-version':
+                    r.browser_version=str(data.get('version',''))[:40]
                     target=request.app.get('browser_version')
                     identity=str(data.get('id',''))[:100]
                     attempted=request.app.setdefault('browser_reload_attempts',set())
@@ -227,7 +228,7 @@ async def browser_handler(request):
                         attempted.add(identity)
                         await ws.send_json({'type':'extension-reload','version':target})
                 elif data.get('type')=='movie-capabilities':
-                    r.movie_capable=data.get('version')==3
+                    r.movie_capable=type(data.get('version')) is int and data['version']>=3
                 elif data.get('type')=='movie-search-results':
                     callback=r.playback.discoveries.get(data.get('requestId'))
                     if callback and isinstance(data.get('links'),list):callback(data['links'][:40])
@@ -255,7 +256,7 @@ async def browser_handler(request):
             except (ValueError,TypeError,AttributeError): continue
     finally:
         if r.browser is ws:
-            r.browser=None;r.movie_capable=False;r.browser_tabs=[];r.browser_focus=False
+            r.browser=None;r.movie_capable=False;r.browser_version=None;r.browser_tabs=[];r.browser_focus=False
             await r.playback.reset()
             await r.publish_tabs()
             for future in r.browser_pending.values():

@@ -43,16 +43,23 @@ class Playback:
                 if r.browser is not None:
                     try:await r.browser.send_json({'type':'movie-cancel','requestId':ident})
                     except Exception:pass
+    def browser_status(self):
+        from .version import VERSION
+        r=self.remote;connected=r.browser is not None;ready=connected and r.movie_capable
+        version=getattr(r,'browser_version',None)
+        reason='' if ready else ('Brave eklentisi bağlı değil. Brave açık olmalı; Sofa Remote eklentisi etkin olmalı.' if not connected else 'Bağlı eklenti film aramasını desteklemiyor veya güncellemesini tamamlamadı. Brave eklentisini Yenile düğmesiyle bir kez yeniden yükleyin.')
+        return {'connected':connected,'ready':ready,'extension_version':version,'server_version':VERSION,'reason':reason}
+
     def sources(self,ident,force=False):
-        movie=self.remote.movies.get(ident)
-        if not self.remote.movie_capable or self.remote.browser is None:return {'movie':movie,'state':'extension_required','offers':[],'message':'İzlenebilirliği kontrol etmek için PC tarayıcı eklentisini güncelleyin. Platform hesabına PC tarayıcısında giriş yapılmış olmalı.'}
-        job=self.jobs.get(ident)
+        movie=self.remote.movies.get(ident);job=self.jobs.get(ident)
+        browser=self.browser_status()
         if force and hasattr(self.remote.movies,'cache'):
             for key in (('detail',ident),('fallback',ident)):self.remote.movies.cache.pop(key,None)
-        if job and (job['state']=='checking' or not force and time.time()-job['checked']<600):return {**job,'offers':list(job['offers'])}
+        if job and (job['state']=='checking' or not force and time.time()-job['checked']<(600 if job['offers'] else 15)):
+            return {**job,'offers':list(job['offers']),'browser':browser}
         job={'movie':movie,'state':'checking','offers':[],'candidates':[],'diagnostics':[],'queries':[],'checked':time.time(),'attempted':0,'discovered':0,'failures':[],'message':'Türkçe ve özgün/İngilizce adlarla kaynaklar aranıyor; TV’de otomatik tam ekran açılmaz.'};self.jobs[ident]=job
         task=asyncio.create_task(self.check(ident,job));self.workers[ident]=task
-        return {**job,'offers':[]}
+        return {**job,'offers':[],'browser':browser}
     async def check(self,ident,job):
         from .movie_search import queries,merge,names
         r=self.remote;seen=set();queue=asyncio.Queue();tasks=[]
@@ -72,7 +79,15 @@ class Playback:
             try:
                 result=await r.movies.fallback(ident);enqueue(result['offers']);job['diagnostics'].extend(result.get('diagnostics',[]))
             except Exception:job['diagnostics'].append('Web arama kaynağına ulaşılamadı.')
+        async def wait_for_browser():
+            # Allow a just-reloaded extension to finish its handshake. Web discovery runs meanwhile.
+            for _ in range(8):
+                if self.browser_status()['ready']:break
+                await asyncio.sleep(.25)
+            return self.browser_status()['ready']
         async def browser_search():
+            if not await wait_for_browser():
+                job['diagnostics'].append(self.browser_status()['reason']);return
             try:
                 result=await self.command('movie-search',queries=job['queries'],names=names(job['movie']),on_results=lambda links:enqueue(merge(job['movie'],links)))
                 enqueue(merge(job['movie'],result.get('links',[])));job['diagnostics'].extend(result.get('diagnostics',[]))
@@ -80,6 +95,9 @@ class Playback:
         async def inspect(offer):
             row={**offer,'source_id':secrets.token_urlsafe(12),'checked':time.time()}
             try:
+                if not await wait_for_browser():
+                    row.update(status='extension_required',reason=self.browser_status()['reason'])
+                    job['candidates'].append(row);return
                 proof=await self.command('movie-probe',url=offer['url'],movie=job['movie'],passive=True,timeout=11000,turkish_subtitles=False)
                 status=proof.get('status','verified');duration=proof.get('duration');runtime=job['movie'].get('runtime')
                 row.update(status=status,reason=proof.get('reason',''),video_found=proof.get('video_found',False))
@@ -126,6 +144,8 @@ class Playback:
             job['diagnostics']=list(dict.fromkeys(job['diagnostics']))
             if job['offers']:job['message']=f"{len(job['offers'])} kaynakta tam film videosu hazır. Sessiz arka plan kontrolü tamamlandı; yükleme kanıtı oynatım garantisi değildir."
             elif job['candidates']:job['message']='Film sayfaları bulundu; mevcut oturumda oynatılabilirlik/altyazı kesinleşmedi. Aşağıda her kaynağın nedeni var.'
+            elif not self.browser_status()['ready']:
+                job['state']='blocked';job['message']=self.browser_status()['reason']+' Web araması çalıştı; PC oynatıcı kontrolü başlayamadı.'
             else:job['message']='Aramalarda doğrulanabilir film kaynağı elde edilemedi. Bu, filmin internette bulunmadığı anlamına gelmez; arama tanısını kontrol edin.'
 
     async def open_source(self,ident,source_id):

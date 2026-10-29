@@ -2,7 +2,7 @@ plugins { id 'com.android.application' }
 android {
     namespace 'app.sofaremote'
     compileSdk 35
-    defaultConfig { applicationId 'app.sofaremote'; minSdk 26; targetSdk 35; versionCode 14; versionName '0.4.5'; testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner' }
+    defaultConfig { applicationId 'app.sofaremote'; minSdk 26; targetSdk 35; versionCode 15; versionName '0.4.6'; testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner' }
     signingConfigs {
         release {
             if (System.getenv('SOFA_STORE_PASSWORD')) {

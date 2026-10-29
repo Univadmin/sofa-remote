@@ -133,3 +133,11 @@ yıl/fragman sonuçları hazır kaynaklara eklenmez.
 Kaynağı PC'de açmak veya Oynatmayı dene düğmesine basmak kullanıcıya aittir.
 Yabancı filmlerde Türkçe altyazı gerekir; Türkçe özgün film seçeneği bu koşulu
 kaldırır. Üyelik, bölge ve oynatıcı durumları mevcut PC oturumuna bağlıdır.
+
+### Film araması bağlantı tanısı (v0.4.6)
+
+Eklenti bağlı olmasa da platform ve web araması başlar; bulunan sayfalar
+oynatıcı doğrulaması bekliyor olarak korunur. Film kartında Windows ve bağlı
+eklenti sürümü görünür. Eklenti eksik/eski olduğunda bağlantı açıklaması,
+sonuç alınamadığında açık arama tanısı gösterilir. Boş sonuç kısa süre
+önbelleğe alınır; “Kaynakları yeniden kontrol et” yeni arama başlatır.

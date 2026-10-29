@@ -87,3 +87,30 @@ class PlaybackTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.playback.sources('tm1')['state'],'checking')
         release.set();await self.playback.workers['tm1']
         self.assertEqual(len(self.playback.sources('tm1')['offers']),1)
+
+    async def test_missing_extension_still_searches_and_preserves_candidates(self):
+        self.remote.browser=None;self.remote.movie_capable=False
+        self.catalog.details.return_value={'offers':[]}
+        self.catalog.fallback.return_value={'offers':[{'url':'https://example.com/movie'}]}
+        self.playback.command=AsyncMock()
+        first=self.playback.sources('tm1',force=True)
+        self.assertEqual(first['state'],'checking')
+        await self.playback.workers['tm1']
+        result=self.playback.sources('tm1')
+        self.catalog.fallback.assert_awaited_once()
+        self.playback.command.assert_not_awaited()
+        self.assertEqual(result['candidates'][0]['status'],'extension_required')
+        self.assertFalse(result['browser']['connected'])
+        self.assertTrue(result['browser']['reason'])
+
+    async def test_old_extension_reports_blocked_instead_of_empty_success(self):
+        self.remote.movie_capable=False;self.remote.browser_version='0.4.4'
+        self.catalog.details.return_value={'offers':[]}
+        self.playback.sources('tm1',force=True)
+        await self.playback.workers['tm1']
+        result=self.playback.sources('tm1')
+        self.assertEqual(result['state'],'blocked')
+        self.assertEqual(result['browser']['extension_version'],'0.4.4')
+        self.assertTrue(result['diagnostics'])
+        self.catalog.fallback.assert_awaited_once()
+        self.assertEqual(self.playback.sources('tm1',force=True)['state'],'checking')
