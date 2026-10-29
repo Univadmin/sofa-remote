@@ -14,9 +14,9 @@ class ValidationTests(unittest.TestCase):
         import json
         from pathlib import Path
         root=Path(__file__).resolve().parents[1]
-        self.assertIn("d.version!=='"+VERSION+"'",(root/'web/app.js').read_text())
-        self.assertEqual(json.loads((root/'browser/manifest.json').read_text())['version'],VERSION)
-        self.assertIn("versionName '"+VERSION+"'",(root/'android/app/build.gradle').read_text())
+        self.assertIn("d.version!=='"+VERSION+"'",(root/'web/app.js').read_text(encoding='utf-8'))
+        self.assertEqual(json.loads((root/'browser/manifest.json').read_text(encoding='utf-8'))['version'],VERSION)
+        self.assertIn("versionName '"+VERSION+"'",(root/'android/app/build.gradle').read_text(encoding='utf-8'))
 
     def test_url_restrictions(self):
         for url in ['file:///secret','javascript:alert(1)','https://user:pass@example.com','cmd.exe',None]:
