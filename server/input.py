@@ -11,7 +11,9 @@ KEYS = {**{chr(i): i for i in range(65, 91)}, **{str(i): 48+i for i in range(10)
         'ENTER': 13, 'TAB': 9, 'ESC': 27, 'SPACE': 32, 'BACKSPACE': 8,
         'DELETE': 46, 'LEFT': 37, 'UP': 38, 'RIGHT': 39, 'DOWN': 40,
         'HOME': 36, 'END': 35, 'PAGEUP': 33, 'PAGEDOWN': 34,
-        'INSERT': 45, 'CAPSLOCK': 20, 'PRINTSCREEN': 44,
+        'INSERT': 45, 'CAPSLOCK': 20, 'PRINTSCREEN': 44, 'PAUSE': 19,
+        'ADD': 107, 'SUBTRACT': 109, 'MULTIPLY': 106,
+        'PERIOD': 190, 'COMMA': 188, 'SEMICOLON': 186, 'SLASH': 191,
         'VOLUMEUP': 175, 'VOLUMEDOWN': 174, 'MUTE': 173,
         'PLAYPAUSE': 179, 'STOP': 178, 'NEXT': 176, 'PREVIOUS': 177}
 

@@ -141,3 +141,22 @@ oynatıcı doğrulaması bekliyor olarak korunur. Film kartında Windows ve bağ
 eklenti sürümü görünür. Eklenti eksik/eski olduğunda bağlantı açıklaması,
 sonuç alınamadığında açık arama tanısı gösterilir. Boş sonuç kısa süre
 önbelleğe alınır; “Kaynakları yeniden kontrol et” yeni arama başlatır.
+
+### Geniş mouse alanı ve Windows kısayolları (v0.4.7)
+
+Düzen → Geniş mouse alanı seçeneğini açın. Kumandalardan birini Mouse,
+diğerini Medya veya Klavye seçin. Medya üstte önceki, oynat/duraklat,
+durdur ve sonraki düğmeleriyle görünür. Klavyede ince yazı alanına dokunarak
+telefon klavyesini açabilirsiniz. Kalan alan normal touchpad gibi çalışır:
+dokunma sol tık, çift dokunup ikinci dokunuşu tutarak kaydırma sürüklemedir.
+İki parmakla kaydırma ve sağ tık desteklenir. Hız ve solak ayarı Düzen
+menüsündedir. Seçenek kapatılınca önceki iki kumandalı düzen geri gelir.
+
+Klavye alanının altındaki Windows kısayolları düğmesi sık kullanılanları,
+aranabilir tüm listeyi ve kategorileri açar. Liste Windows 10 sistem,
+metin, pencere, sanal masaüstü, Dosya Gezgini, görev çubuğu ve iletişim
+kutusu kısayollarını içerir. Mouse ile birlikte kullanılan veya Windows'un
+uygulamadan göndermeye izin vermediği birleşimler açıklama olarak gösterilir.
+Komutlar PC'de odaktaki pencereye uygulanır. Windows ayarlarına bağlı
+kısayolların koşulları listede belirtilir. PC'de metin alanına odaklanınca
+telefon klavyesi kendiliğinden açılmaz; kullanıcı telefon alanına dokunur.

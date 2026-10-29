@@ -93,8 +93,15 @@ public class RemoteInteractionTest {
         waitFor(()->"0".equals(js("document.querySelectorAll('#top-tabs button').length")));
         assertEquals("true",js("testSent.some(x=>x.type==='tab'&&x.action==='close'&&x.tabId===101)"));
     }
-    @Test public void pcFocusOpensNativeKeyboardAndSendsText()throws Exception{
-        js("fetch('/__focus',{method:'POST'});true");
+    @Test public void pcFocusStaysClosedAndCompactKeyboardOpensOnTap()throws Exception{
+        js("fetch('/__focus',{method:'POST'});true");SystemClock.sleep(700);
+        assertEquals("true",js("paneTypes.join(',')==='mouse,media'"));
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->assertFalse(rule.getActivity().getCurrentFocus() instanceof EditText));
+        js("paneTypes=['mouse','media'];mouseExpanded=true;renderWorkspace();testSent=[];true");
+        tap(".compact-transport button:nth-child(2)");tap(".touchpad");
+        waitFor(()->"true".equals(js("testSent.some(x=>x.type==='keys'&&x.keys[0]==='PLAYPAUSE')&&testSent.filter(x=>x.type==='button'&&x.button==='left').length===2")));
+        assertEquals("true",js("document.querySelector('.touchpad').getBoundingClientRect().height>document.querySelector('#workspace').getBoundingClientRect().height*.65"));
+        js("paneTypes=['mouse','keyboard'];mouseExpanded=true;renderWorkspace();testSent=[];true");tap(".compact-editor");
         waitFor(()->{boolean[] ready=new boolean[1];InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{View focus=rule.getActivity().getCurrentFocus();ready[0]=focus instanceof EditText&&focus.getRootWindowInsets()!=null&&focus.getRootWindowInsets().isVisible(WindowInsets.Type.ime())&&focus.getRootWindowInsets().getInsets(WindowInsets.Type.ime()).bottom>100;});return ready[0];});
         screenshot("native-keyboard");onView(withHint("PC’ye yaz…")).perform(typeText("abc"));
         try{waitFor(()->"\"abc\"".equals(js("testSent.filter(x=>x.type==='edit').map(x=>x.text).join('')")));}catch(AssertionError error){throw new AssertionError(js("JSON.stringify(testSent)"),error);}

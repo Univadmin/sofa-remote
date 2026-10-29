@@ -7,7 +7,7 @@ for(const name of ['Düzen','Kısayollar','Güncelleme'])test(`${name}: opening 
  const listeners={},sheet={open:false};let opened=0;
  const button={isConnected:true,matches:()=>false,click(){opened++;sheet.open=true;},closest(selector){return selector.includes('button')?this:null;}};
  const backdrop={closest:()=>null};
- const context={fullMouse:true,globalMouse:null,HoldMouse,Map,performance:{now:()=>100},setTimeout:()=>1,clearTimeout(){},gestureOptions:options=>({...options,click(){}}),window:{},$:()=>sheet,document:{addEventListener:(name,fn)=>listeners[name]=fn,body:{classList:{toggle(){}}}}};
+ const context={fullMouse:true,expandedPair:()=>false,globalMouse:null,HoldMouse,Map,performance:{now:()=>100},setTimeout:()=>1,clearTimeout(){},gestureOptions:options=>({...options,click(){}}),window:{},$:()=>sheet,document:{addEventListener:(name,fn)=>listeners[name]=fn,body:{classList:{toggle(){}}}}};
  const source=fs.readFileSync('web/app.js','utf8');
  vm.runInNewContext(source.slice(source.indexOf('function setupFullMouse(){'),source.indexOf('\nfunction iconFor('))+'\nsetupFullMouse();',context);
  const event=target=>({target,pointerId:1,clientX:10,clientY:10,cancelable:true,preventDefault(){this.prevented=true;},stopImmediatePropagation(){this.stopped=true;}});
